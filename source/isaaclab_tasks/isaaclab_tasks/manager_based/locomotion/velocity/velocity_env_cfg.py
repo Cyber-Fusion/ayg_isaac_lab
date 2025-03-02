@@ -252,6 +252,13 @@ class RewardsCfg:
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=0.0)
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
+    
+    # ======================================================================= #
+    
+    base_height = RewTerm(
+        func=mdp.base_height, weight=10.0,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="Base"), "threshold": 0.3}
+    )
 
 
 @configclass
