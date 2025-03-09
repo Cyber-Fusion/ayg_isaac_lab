@@ -255,11 +255,20 @@ class RewardsCfg:
     
     # ======================================================================= #
     
-    base_height = RewTerm(
-        func=mdp.base_height, weight=10.0,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names="Base"), "threshold": 0.3}
+    base_height_l2 = RewTerm(
+        func=mdp.base_height_l2,
+        weight=0.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "target_height": 0.3,
+        }
     )
-
+    
+    joint_deviation_l1 = RewTerm(
+        func=mdp.joint_deviation_l1,
+        weight=0.0,
+    )
+    
 
 @configclass
 class TerminationsCfg:

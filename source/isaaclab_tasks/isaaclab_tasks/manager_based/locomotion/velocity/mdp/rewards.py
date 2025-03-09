@@ -14,23 +14,12 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from isaaclab.assets import RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_rotate_inverse, yaw_quat
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
-
-
-def base_height(
-    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names="Base"), threshold: float = 0.5
-) -> torch.Tensor:
-    """Reward the agent for maintaining a certain base height above the ground."""
-    
-    asset: RigidObject = env.scene[asset_cfg.name]
-    reward = torch.clamp(asset.data.root_link_pos_w[:, 2] - threshold, min=0.0)
-    return reward
 
 
 def feet_air_time(
