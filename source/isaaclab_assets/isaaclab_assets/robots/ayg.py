@@ -24,11 +24,12 @@ from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 AYG_MOTOR_SIMPLE_ACTUATOR_CFG = DCMotorCfg(
     joint_names_expr=[".*HAA", ".*HFE", ".*KFE"],
-    saturation_effort=50.0,
-    effort_limit=40.0,
-    velocity_limit=7.5,
-    stiffness={".*": 40.0},
-    damping={".*": 5.0},
+    effort_limit=23.5,
+    saturation_effort=23.5,
+    velocity_limit=10.0,
+    stiffness=25.0,
+    damping=0.5,
+    friction=0.0,
 )
 """Configuration for AYG's motor with DC actuator model."""
 
@@ -52,7 +53,7 @@ AYG_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=4
         ),
         # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.02, rest_offset=0.0),
     ),
@@ -63,6 +64,7 @@ AYG_CFG = ArticulationCfg(
             ".*HFE": 0.0,       # all HFE
             ".*KFE": 0.0,       # all KFE
         },
+        joint_vel={".*": 0.0},
     ),
     actuators={"legs": AYG_MOTOR_SIMPLE_ACTUATOR_CFG},
     soft_joint_pos_limit_factor=0.95,
