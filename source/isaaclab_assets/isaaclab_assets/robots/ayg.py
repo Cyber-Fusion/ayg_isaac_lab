@@ -10,13 +10,9 @@ Reference:
 
 """
 
-from isaaclab_assets.sensors.velodyne import VELODYNE_VLP_16_RAYCASTER_CFG
-
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import DCMotorCfg
 from isaaclab.assets.articulation import ArticulationCfg
-from isaaclab.sensors import RayCasterCfg
-# from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 ##
 # Configuration - Actuators.
@@ -70,13 +66,3 @@ AYG_CFG = ArticulationCfg(
     soft_joint_pos_limit_factor=0.95,
 )
 """Configuration of Ayg robot using DC actuator."""
-
-
-##
-# Configuration - Sensors.
-##
-
-AYG_LIDAR_CFG = VELODYNE_VLP_16_RAYCASTER_CFG.replace(
-    offset=RayCasterCfg.OffsetCfg(pos=(-0.310, 0.000, 0.159), rot=(0.0, 0.0, 0.0, 1.0))
-)
-"""Configuration for the Velodyne VLP-16 sensor mounted on the AYG robot's base."""

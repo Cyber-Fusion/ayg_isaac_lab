@@ -23,6 +23,7 @@ class AygRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot = AYG_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.events.add_base_mass.params["asset_cfg"].body_names = "Base"
         self.events.base_external_force_torque.params["asset_cfg"].body_names = "Base"
+        self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Base"
         # Rename the joints in the rewards
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_Foot"
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = ".*_Shank"
