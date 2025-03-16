@@ -13,10 +13,10 @@ Reference:
 from isaaclab_assets.sensors.velodyne import VELODYNE_VLP_16_RAYCASTER_CFG
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators import ActuatorNetLSTMCfg, DCMotorCfg
+from isaaclab.actuators import DCMotorCfg
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.sensors import RayCasterCfg
-from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
+# from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 ##
 # Configuration - Actuators.
@@ -26,7 +26,7 @@ AYG_MOTOR_SIMPLE_ACTUATOR_CFG = DCMotorCfg(
     joint_names_expr=[".*HAA", ".*HFE", ".*KFE"],
     effort_limit=23.5,
     saturation_effort=23.5,
-    velocity_limit=10.0,
+    velocity_limit=20.0,
     stiffness=25.0,
     damping=0.5,
     friction=0.0,

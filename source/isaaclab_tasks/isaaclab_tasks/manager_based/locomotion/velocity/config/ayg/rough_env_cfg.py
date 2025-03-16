@@ -50,9 +50,14 @@ class AygRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         }
         
         # rewards
-        self.rewards.track_lin_vel_xy_exp.weight = 2.5
-        self.rewards.track_ang_vel_z_exp.weight = 1.25
-
+        self.rewards.track_lin_vel_xy_exp.weight = 2.0
+        self.rewards.track_ang_vel_z_exp.weight = 1.0
+        self.rewards.dof_torques_l2.weight = -0.0002
+        self.rewards.dof_acc_l2.weight = -2.5e-7
+        self.rewards.feet_air_time.weight = 0.01
+        self.rewards.undesired_contacts = None
+        self.rewards.base_height_l2.weight = 0.0
+        self.rewards.joint_deviation_l1.weight = 0.0
 
 @configclass
 class AygRoughEnvCfg_PLAY(AygRoughEnvCfg):
