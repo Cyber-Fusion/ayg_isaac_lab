@@ -128,6 +128,20 @@ def body_lin_acc_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEnt
     return torch.sum(torch.norm(asset.data.body_lin_acc_w[:, asset_cfg.body_ids, :], dim=-1), dim=1)
 
 
+def feet_regulation(
+    env: ManagerBasedRLEnv,
+    target_height: float = 0.1,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=".*_Foot"),
+) -> torch.Tensor:
+    """Penalize the regulation of the feet."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    return torch.sum(
+        torch.sum(torch.square(asset.data.root_lin_vel_w[:, 0:2]), dim=1) * torch.exp(
+            - asset.data.root_link_pos_w[:, 2] / (0.025 * target_height)
+        )
+    )
+
+
 """
 Joint penalties.
 """

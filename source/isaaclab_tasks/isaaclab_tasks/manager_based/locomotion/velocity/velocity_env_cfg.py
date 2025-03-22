@@ -269,6 +269,15 @@ class RewardsCfg:
         weight=0.0,
     )
     
+    feet_regulation = RewTerm(
+        func=mdp.feet_regulation,
+        weight=0.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT"),
+            "target_height": 0.1,
+        }
+    )
+    
 
 @configclass
 class TerminationsCfg:
