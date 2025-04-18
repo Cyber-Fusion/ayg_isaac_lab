@@ -9,6 +9,7 @@ Ayg Isaac Lab is a fork of [Isaac Lab](https://isaac-sim.github.io/IsaacLab) tha
   - [Installation](#installation)
     - [Docker](#docker)
   - [Usage](#usage)
+      - [Teleoperation](#teleoperation)
   - [Troubleshooting](#troubleshooting)
 
 ## Installation
@@ -80,13 +81,27 @@ Train the robot with
 
 Visualize the training performance with
 ```shell
-./isaaclab.sh -p -m tensorboard.main --logdir logs/rl_games/ayg_flat_direct/path_to_log
+./isaaclab.sh -p -m tensorboard.main --logdir logs/rl_games/ayg_flat/path_to_log
 ```
 
 Test the trained robot with
 ```shell
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Flat-Ayg-Direct-v0 --num_envs 32 --checkpoint /path/to/checkpoint
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Flat-Ayg-v0 --num_envs 32 --checkpoint /path/to/checkpoint
 ```
+
+#### Teleoperation
+
+Test and teleoperate the trained robot with
+```shell
+python3 scripts/demos/ayg_locomotion.py
+```
+This will open a window where you can control a robot by clicking on it.
+The robot can be given a reference velocity using the arrows keys.
+To change visual press the `c` key.
+To exit the teleoperation press `esc`.
+
+**Known bugs**:
+- The displayed reference velocities are wrong.
 
 ## Troubleshooting
 
