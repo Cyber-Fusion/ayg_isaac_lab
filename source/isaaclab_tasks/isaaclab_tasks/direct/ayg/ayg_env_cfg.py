@@ -58,7 +58,6 @@ class AygFlatEnvCfg(DirectRLEnvCfg):
     sim: SimulationCfg = SimulationCfg(
         dt=1 / 200,
         render_interval=decimation,
-        disable_contact_processing=True,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
             restitution_combine_mode="multiply",
@@ -94,17 +93,17 @@ class AygFlatEnvCfg(DirectRLEnvCfg):
     )
 
     # reward scales
-    lin_vel_reward_scale = 7.5
-    yaw_rate_reward_scale = 2.5
+    lin_vel_reward_scale = 2.0
+    yaw_rate_reward_scale = 1.0
     z_vel_reward_scale = -2.0
-    ang_vel_reward_scale = -0.25
+    ang_vel_reward_scale = -0.05
     joint_torque_reward_scale = -2.5e-5
     joint_accel_reward_scale = -2.5e-7
-    action_rate_reward_scale = -0.1
+    action_rate_reward_scale = -0.01
     feet_air_time_reward_scale = 0.5
-    undersired_contact_reward_scale = -1.0
+    undesired_contact_reward_scale = -1.0
     flat_orientation_reward_scale = -5.0
-    cosmetic_reward_scale = -0.24
+    cosmetic_reward_scale = -0.0
 
 
 @configclass

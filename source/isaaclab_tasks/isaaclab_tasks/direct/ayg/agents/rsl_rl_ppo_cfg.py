@@ -4,7 +4,7 @@ from isaaclab.utils import configclass
 
 
 @configclass
-class AnymalCFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class AygFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 500
     save_interval = 50
@@ -33,7 +33,7 @@ class AnymalCFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 
 
 @configclass
-class AnymalCRoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class AygRoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1500
     save_interval = 50

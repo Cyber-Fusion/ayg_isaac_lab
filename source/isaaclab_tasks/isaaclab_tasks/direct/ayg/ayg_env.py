@@ -60,9 +60,8 @@ class AygEnv(DirectRLEnv):
         self.cfg.terrain.num_envs = self.scene.cfg.num_envs
         self.cfg.terrain.env_spacing = self.scene.cfg.env_spacing
         self._terrain = self.cfg.terrain.class_type(self.cfg.terrain)
-        # clone, filter, and replicate
+        # clone and replicate
         self.scene.clone_environments(copy_from_source=False)
-        self.scene.filter_collisions(global_prim_paths=[self.cfg.terrain.prim_path])
         # add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
@@ -124,7 +123,7 @@ class AygEnv(DirectRLEnv):
         air_time = torch.sum((last_air_time - 0.5) * first_contact, dim=1) * (
             torch.norm(self._commands[:, :2], dim=1) > 0.1
         )
-        # undersired contacts
+        # undesired contacts
         net_contact_forces = self._contact_sensor.data.net_forces_w_history
         is_contact = (
             torch.max(torch.norm(net_contact_forces[:, :, self._undesired_contact_body_ids], dim=-1), dim=1)[0] > 1.0
@@ -132,7 +131,7 @@ class AygEnv(DirectRLEnv):
         contacts = torch.sum(is_contact, dim=1)
         # flat orientation
         flat_orientation = torch.sum(torch.square(self._robot.data.projected_gravity_b[:, :2]), dim=1)
-        
+        # cosmetic
         dof_pos = self._robot.data.joint_pos
         default_dof_pos = self._robot.data.default_joint_pos
         cosmetic = (
@@ -148,7 +147,7 @@ class AygEnv(DirectRLEnv):
             "dof_acc_l2": joint_accel * self.cfg.joint_accel_reward_scale * self.step_dt,
             "action_rate_l2": action_rate * self.cfg.action_rate_reward_scale * self.step_dt,
             "feet_air_time": air_time * self.cfg.feet_air_time_reward_scale * self.step_dt,
-            "undesired_contacts": contacts * self.cfg.undersired_contact_reward_scale * self.step_dt,
+            "undesired_contacts": contacts * self.cfg.undesired_contact_reward_scale * self.step_dt,
             "flat_orientation_l2": flat_orientation * self.cfg.flat_orientation_reward_scale * self.step_dt,
             "cosmetic": cosmetic * self.cfg.cosmetic_reward_scale * self.step_dt,
         }
