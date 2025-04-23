@@ -74,19 +74,23 @@ Bring down the container and remove it with
 
 ## Usage
 
+Optional arguments are enclosed within square brackets, i.e. `[]`.
+For single option arguments, the default value is shown after the equal sign.
+For multiple option, the available options are listed within curly brackets, i.e. `{}`.
+
 Train the robot with
 ```shell
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-Ayg-v0 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-Ayg-{v0, v2} --headless [--max_iterations=300]
 ```
 
 Visualize the training performance with
 ```shell
-./isaaclab.sh -p -m tensorboard.main --logdir logs/rl_games/ayg_flat/path_to_log
+./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/ayg_flat/path_to_log
 ```
 
 Test the trained robot with
 ```shell
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Flat-Ayg-v0 --num_envs 32 --checkpoint /path/to/checkpoint
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py --task Isaac-Velocity-Flat-Ayg-{v0, v2} --num_envs 32 --checkpoint /path/to/checkpoint
 ```
 
 #### Teleoperation
