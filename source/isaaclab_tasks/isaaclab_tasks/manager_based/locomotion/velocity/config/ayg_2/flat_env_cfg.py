@@ -223,7 +223,7 @@ class AygRewardsCfg:
             "std": 0.1,
             "max_err": 0.2,
             "velocity_threshold": 0.5,
-            "synced_feet_pair_names": (("LF_Foot", "RH_Foot"), ("RF_Foot", "RH_Foot")),
+            "synced_feet_pair_names": (("LF_Foot", "RH_Foot"), ("RF_Foot", "LH_Foot")),
             "asset_cfg": SceneEntityCfg("robot"),
             "sensor_cfg": SceneEntityCfg("contact_forces"),
         },
