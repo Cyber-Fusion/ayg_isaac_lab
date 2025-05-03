@@ -5,11 +5,11 @@
 
 from isaaclab.utils import configclass
 
-from .rough_env_cfg import Ayg3RoughEnvCfg
+from .rough_env_cfg import AygRoughWTWEnvCfg
 
 
 @configclass
-class Ayg3FlatEnvCfg(Ayg3RoughEnvCfg):
+class AygFlatWTWEnvCfg(AygRoughWTWEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -28,7 +28,7 @@ class Ayg3FlatEnvCfg(Ayg3RoughEnvCfg):
         self.curriculum.terrain_levels = None
 
 
-class Ayg3FlatEnvCfg_PLAY(Ayg3FlatEnvCfg):
+class AygFlatWTWEnvCfg_PLAY(AygFlatWTWEnvCfg):
     def __post_init__(self) -> None:
         # post init of parent
         super().__post_init__()

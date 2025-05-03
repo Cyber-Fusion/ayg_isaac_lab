@@ -3,11 +3,9 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-from isaaclab.managers import RewardTermCfg, SceneEntityCfg
 from isaaclab.utils import configclass
 
-import isaaclab_tasks.manager_based.locomotion.velocity.config.ayg_3.mdp as ayg_mdp
-from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
+from isaaclab_tasks.manager_based.locomotion.walk_these_ways.walk_these_ways_env_cfg import LocomotionWalkTheseWaysRoughEnvCfg
 
 ##
 # Pre-defined configs
@@ -16,7 +14,7 @@ from isaaclab_assets.robots.ayg import AYG_CFG  # isort: skip
 
 
 @configclass
-class Ayg3RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -54,33 +52,15 @@ class Ayg3RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         }
         
         # rewards
-        self.rewards.track_lin_vel_xy_exp.weight = 2.0
-        self.rewards.track_ang_vel_z_exp.weight = 1.0
+        self.rewards.track_lin_vel_xy_exp.weight = 3.0
+        self.rewards.track_ang_vel_z_exp.weight = 1.5
         self.rewards.dof_torques_l2.weight = -0.0002
         self.rewards.dof_acc_l2.weight = -2.5e-7
         self.rewards.feet_air_time.weight = 0.01
         self.rewards.undesired_contacts.weight = -0.25
-        self.rewards.base_height_l2.weight = -0.0
+        self.rewards.base_height_l2.weight = -2.0
         self.rewards.joint_deviation_l1.weight = -0.0
         self.rewards.feet_regulation.weight = -0.05
-        
-        self.rewards.gait = RewardTermCfg(
-            func=ayg_mdp.GaitReward,
-            weight=-0.5,
-            params={
-                "step_frequency": 2.0,
-                "footstep_height": 0.1,
-                "synced_feet_pair_names": (("LF_Foot", "RH_Foot"), ("RF_Foot", "LH_Foot")),
-                "phi": (0.0, 0.5, 0.0),
-                "sigma": 0.07,
-                "sigma_cf": 50.0,
-                "sigma_cv": 0.5,
-                "asset_cfg": SceneEntityCfg("robot", body_names=".*_Foot"),
-                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[
-                    "LF_Foot", "RF_Foot", "LH_Foot", "RH_Foot"
-                ]),
-            }
-        )
         
         # Commands
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
@@ -88,7 +68,7 @@ class Ayg3RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
 
 @configclass
-class Ayg3RoughEnvCfg_PLAY(Ayg3RoughEnvCfg):
+class AygRoughWTWEnvCfg_PLAY(AygRoughWTWEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()

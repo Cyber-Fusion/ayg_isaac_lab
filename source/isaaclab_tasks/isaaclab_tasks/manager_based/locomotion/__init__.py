@@ -6,3 +6,4 @@
 """Locomotion environments for legged robots."""
 
 from .velocity import *  # noqa
+from .walk_these_ways import *  # noqa

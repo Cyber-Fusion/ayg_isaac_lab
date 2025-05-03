@@ -9,7 +9,7 @@ from isaaclab.utils import configclass
 
 
 @configclass
-class Ayg3RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class AygRoughWTWPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1500
     save_interval = 50
@@ -38,7 +38,7 @@ class Ayg3RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 
 
 @configclass
-class Ayg3FlatPPORunnerCfg(Ayg3RoughPPORunnerCfg):
+class AygFlatWTWPPORunnerCfg(AygRoughWTWPPORunnerCfg):
     def __post_init__(self):
         super().__post_init__()
 
