@@ -66,17 +66,19 @@ class Ayg3RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         
         self.rewards.gait = RewardTermCfg(
             func=ayg_mdp.GaitReward,
-            weight=-8.0,
+            weight=-0.5,
             params={
                 "step_frequency": 2.0,
                 "footstep_height": 0.1,
                 "synced_feet_pair_names": (("LF_Foot", "RH_Foot"), ("RF_Foot", "LH_Foot")),
-                "phi": (0.5, 0.0, 0.0),
-                "sigma": 0.1,
-                "sigma_cf": 0.1,
-                "sigma_cv": 0.1,
+                "phi": (0.0, 0.5, 0.0),
+                "sigma": 0.07,
+                "sigma_cf": 50.0,
+                "sigma_cv": 0.5,
                 "asset_cfg": SceneEntityCfg("robot", body_names=".*_Foot"),
-                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_Foot"),
+                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[
+                    "LF_Foot", "RF_Foot", "LH_Foot", "RH_Foot"
+                ]),
             }
         )
         

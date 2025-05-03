@@ -40,7 +40,7 @@ class GaitReward(ManagerTermBase):
         self.sigma_cv = cfg.params["sigma_cv"]
         
         self.asset: Articulation = env.scene[cfg.params["asset_cfg"].name]
-        self.contact_sensor: ContactSensor = env.scene.sensor[cfg.params["sensor_cfg"].name]
+        self.contact_sensor: ContactSensor = env.scene.sensors[cfg.params["sensor_cfg"].name]
         
         synced_feet_pair_names = cfg.params["synced_feet_pair_names"]
         if (
@@ -54,47 +54,48 @@ class GaitReward(ManagerTermBase):
         
         # ======================== Internal Variables ======================= #
         
-        self.c_feet = torch.zeros(1, 4, device=self.env.device)
+        self.c_feet = torch.zeros(env.num_envs, 4, device=env.device)
         
     def _cdf(self, x, sigma):
         """
         Cumulative density function of a normal distribution.
         """
         
-        return 1 / (sigma * torch.sqrt(2 * torch.pi)) * torch.exp(
-            -0.5 * ((x - 0) / sigma) ** 2
-        )
-
-    def _compute_c_feet(self):
-        t = self.env.episode_length_buf * self.env.step_dt
+        # return 1 / (sigma * (2 * torch.pi)**0.5) * torch.exp(
+        #     -0.5 * ((x - 0) / sigma) ** 2
+        # )
         
-        t_lf = torch.clip(self.step_frequency * t + self.phi[0] + self.phi[2], min=0, max=1)
-        t_rf = torch.clip(self.step_frequency * t + self.phi[1] + self.phi[2], min=0, max=1)
-        t_lh = torch.clip(self.step_frequency * t + self.phi[1], min=0, max=1)
-        t_rh = torch.clip(self.step_frequency * t + self.phi[0], min=0, max=1)
+        return 0.5 * (1.0 + torch.erf(x / (sigma * 2** 0.5)))
+
+    def _compute_c_feet(self, env: ManagerBasedRLEnv):
+        t = env.episode_length_buf * env.step_dt
+        
+        t_lf = torch.remainder(self.step_frequency * t + self.phi[0] + self.phi[2], 1)
+        t_rf = torch.remainder(self.step_frequency * t + self.phi[1] + self.phi[2], 1)
+        t_lh = torch.remainder(self.step_frequency * t + self.phi[1], 1)
+        t_rh = torch.remainder(self.step_frequency * t + self.phi[0], 1)
         
         t_feet = [t_lf, t_rf, t_lh, t_rh]
         
         for i, t_foot in enumerate(t_feet):
-            
-            self.c_feet[0, i] = self._cdf(t_foot, self.sigma) \
+            self.c_feet[:, i] = self._cdf(t_foot, self.sigma) \
                     * (1 - self._cdf(t_foot - 0.5, self.sigma)) \
                 + self._cdf(t_foot - 1, self.sigma) \
                     * (1 - self._cdf(t_foot - 1.5, self.sigma))
-        
+                    
     def swing_phase_tracking_force(
         self,
         env: ManagerBasedRLEnv,
         sensor_cfg: SceneEntityCfg
     ):
-        contact_sensor: ContactSensor = env.scene.sensor[self.contact_sensor.name]
+        contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
         
         net_contact_forces = contact_sensor.data.net_forces_w
         
-        return torch.sum((1 - self.c_feet) * torch.exp(
-            - torch.norm(net_contact_forces[:, sensor_cfg.params["sensor_cfg"].body_ids], dim=-1) \
+        return torch.sum((1 - self.c_feet) * (1 - torch.exp(
+            - torch.norm(net_contact_forces[:, sensor_cfg.body_ids, :], p=2, dim=-1) \
                 / self.sigma_cf
-        ), dim=-1)
+        )), dim=-1)
         
     def stance_phase_tracking_vel(
         self,
@@ -106,9 +107,9 @@ class GaitReward(ManagerTermBase):
         foot_planar_velocity = torch.linalg.norm(
             asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=-1)
         
-        return (1 - self.c_feet) * torch.exp(
+        return torch.sum((self.c_feet) * (1 - torch.exp(
             - foot_planar_velocity / self.sigma_cv
-        )
+        )), dim=-1)
         
     def footswing_height_tracking(
         self,
@@ -120,7 +121,7 @@ class GaitReward(ManagerTermBase):
         foot_height = asset.data.body_pos_w[:, asset_cfg.body_ids, 2]
         
         return torch.sum(
-            (foot_height - self.footstep_height) ** 2 * self.c_feet, dim=-1
+            (foot_height - self.footstep_height) ** 2 * (1 - self.c_feet), dim=-1
         )
         
     def __call__(
@@ -136,7 +137,7 @@ class GaitReward(ManagerTermBase):
         asset_cfg: SceneEntityCfg,
         sensor_cfg: SceneEntityCfg,
     ):
-        self._compute_c_feet()
+        self._compute_c_feet(env)
         
         return self.swing_phase_tracking_force(env, sensor_cfg) \
             + self.stance_phase_tracking_vel(env, asset_cfg) \
