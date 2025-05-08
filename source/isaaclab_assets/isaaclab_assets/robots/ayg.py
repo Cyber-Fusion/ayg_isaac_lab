@@ -20,11 +20,11 @@ from isaaclab.assets.articulation import ArticulationCfg
 
 AYG_MOTOR_SIMPLE_ACTUATOR_CFG = DCMotorCfg(
     joint_names_expr=[".*HAA", ".*HFE", ".*KFE"],
-    effort_limit=23.5,
-    saturation_effort=23.5,
+    effort_limit=60.0,
+    saturation_effort=40.0,
     velocity_limit=20.0,
-    stiffness=25.0,
-    damping=0.5,
+    stiffness=40.0,
+    damping=1.0,
     friction=0.0,
 )
 """Configuration for AYG's motor with DC actuator model."""

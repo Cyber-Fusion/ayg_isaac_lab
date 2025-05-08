@@ -28,7 +28,6 @@ class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_Foot"
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = [".*_Shank", ".*_Thigh"]
         self.rewards.base_height_l2.params["asset_cfg"].body_names = "Base"
-        self.rewards.feet_regulation.params["asset_cfg"].body_names = ".*_Foot"
         # Rename the joints in the terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = ["Base", 'Camera', ".*_Hip"]
         
@@ -52,15 +51,28 @@ class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
         }
         
         # rewards
-        self.rewards.track_lin_vel_xy_exp.weight = 3.0
-        self.rewards.track_ang_vel_z_exp.weight = 1.5
-        self.rewards.dof_torques_l2.weight = -0.0002
-        self.rewards.dof_acc_l2.weight = -2.5e-7
-        self.rewards.feet_air_time.weight = 0.01
-        self.rewards.undesired_contacts.weight = -0.25
-        self.rewards.base_height_l2.weight = -2.0
-        self.rewards.joint_deviation_l1.weight = -0.0
-        self.rewards.feet_regulation.weight = -0.05
+        self.rewards.track_lin_vel_xy_exp.weight = 2.0
+        self.rewards.track_ang_vel_z_exp.weight = 1.0
+        
+        self.rewards.lin_vel_z_l2.weight = -0.04
+        self.rewards.ang_vel_xy_l2.weight = -0.002
+        self.rewards.flat_orientation_l2.weight = -10.0
+        
+        self.rewards.joint_vel_l2.weight = -0.002
+        self.rewards.joint_acc_l2.weight = -5.0e-7
+        self.rewards.joint_torques_l2.weight = -0.002
+        
+        self.rewards.base_height_l2.weight = -20.0
+        self.rewards.feet_slip.weight = -0.08
+        
+        self.rewards.action_rate_l2.weight = -0.2
+        self.rewards.action_smoothness_l2.weight = -0.2
+        
+        self.rewards.feet_air_time.weight = 0.0
+        self.rewards.undesired_contacts.weight = -1.0
+        
+        self.rewards.gait.weight = 8.0
+        self.rewards.footswing_height.weight = -60.0
         
         # Commands
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
@@ -87,5 +99,5 @@ class AygRoughWTWEnvCfg_PLAY(AygRoughWTWEnvCfg):
         # disable randomization for play
         self.observations.policy.enable_corruption = False
         # remove random pushing event
-        self.events.base_external_force_torque = None
-        self.events.push_robot = None
+        # self.events.base_external_force_torque = None
+        # self.events.push_robot = None

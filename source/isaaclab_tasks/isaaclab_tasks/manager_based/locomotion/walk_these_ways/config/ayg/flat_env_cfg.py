@@ -15,8 +15,8 @@ class AygFlatWTWEnvCfg(AygRoughWTWEnvCfg):
         super().__post_init__()
         
         # override rewards
-        self.rewards.flat_orientation_l2.weight = -2.5
-        self.rewards.feet_air_time.weight = 0.25
+        # self.rewards.track_lin_vel_xy_exp.weight = 3.0
+        # self.rewards.track_ang_vel_z_exp.weight = 1.5
 
         # change terrain to flat
         self.scene.terrain.terrain_type = "plane"
@@ -38,6 +38,6 @@ class AygFlatWTWEnvCfg_PLAY(AygFlatWTWEnvCfg):
         self.scene.env_spacing = 2.5
         # disable randomization for play
         self.observations.policy.enable_corruption = False
-        # remove random pushing event
-        self.events.base_external_force_torque = None
-        self.events.push_robot = None
+        # # remove random pushing event
+        # self.events.base_external_force_torque = None
+        # self.events.push_robot = None
