@@ -50,3 +50,18 @@ def terrain_out_of_bounds(
         return torch.logical_or(x_out_of_bounds, y_out_of_bounds)
     else:
         raise ValueError("Received unsupported terrain type, must be either 'plane' or 'generator'.")
+
+def simulation_crashed(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), threshold: float = 0.5
+) -> torch.Tensor:
+    """Terminate when the simulation crashed.
+
+    The simulation is considered to be crashed if the root position of the actor is too far away from
+    the initial position.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject = env.scene[asset_cfg.name]
+    return torch.logical_or(
+        torch.isnan(asset.data.root_link_lin_vel_w[:, 0]),
+        torch.isinf(asset.data.root_link_lin_vel_w[:, 0])
+    )

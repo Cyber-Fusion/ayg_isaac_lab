@@ -316,6 +316,10 @@ class ObservationManager(ManagerBase):
                 obs = obs.clip_(min=term_cfg.clip[0], max=term_cfg.clip[1])
             if term_cfg.scale is not None:
                 obs = obs.mul_(term_cfg.scale)
+            
+            if torch.isnan(obs).any() or torch.isinf(obs).any():
+                obs = torch.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0)
+            
             # Update the history buffer if observation term has history enabled
             if term_cfg.history_length > 0:
                 self._group_obs_term_history_buffer[group_name][term_name].append(obs)

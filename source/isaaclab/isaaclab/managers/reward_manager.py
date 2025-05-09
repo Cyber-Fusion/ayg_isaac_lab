@@ -148,6 +148,8 @@ class RewardManager(ManagerBase):
                 continue
             # compute term's value
             value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
+            if torch.isnan(value).any() or torch.isinf(value).any():
+                value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
             positive_reward = torch.clip(value, min=0.0)
             negative_reward += torch.clip(value, max=0.0)
             # update total reward
@@ -158,7 +160,7 @@ class RewardManager(ManagerBase):
             # Update current reward for this step.
             self._step_reward[:, self._term_names.index(name)] = value / dt
             
-        self._reward_buf += torch.exp(negative_reward * 0.02 / 100) * 100
+        self._reward_buf *= torch.exp(negative_reward / 0.02)
 
         return self._reward_buf
 

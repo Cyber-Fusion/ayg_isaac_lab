@@ -95,11 +95,11 @@ class CommandsCfg:
         resampling_time_range=(5.0, 5.0),  # Fixed resampling time of 5 seconds
         debug_vis=False,  # No debug visualization needed
         ranges=mdp.UniformGaitCommandCfgQuad.Ranges(
-            frequencies=(1.5, 2.5),  # Gait frequency range [Hz]
+            frequencies=(2.0, 4.0),  # Gait frequency range [Hz]
             durations=(0.5, 0.5),  # Contact duration range [0-1]
-            offsets2=(0.5, 0.5),  # Phase offset2 range [0-1]
-            offsets3=(0.0, 0.0),  # Phase offset3 range [0-1]
-            offsets4=(0.0, 0.0),  # Phase offset4 range [0-1]
+            offsets2=(0.5, 0.5),  # Phase offsets2 range [0-1]
+            offsets3=(0.5, 0.5),  # Phase offsets3 range [0-1]
+            offsets4=(0.0, 0.0),  # Phase offsets4 range [0-1]
         ),
     )
 
@@ -326,7 +326,7 @@ class RewardsCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="Base"),
             # "sensor_cfg": SceneEntityCfg("height_scanner"),
-            "target_height": 0.4,
+            "target_height": 0.5,
         }
     )
     
@@ -419,6 +419,10 @@ class TerminationsCfg:
     base_contact = DoneTerm(
         func=mdp.illegal_contact,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
+    )
+    simulation_crashed = DoneTerm(
+        func=mdp.simulation_crashed,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="Base"), "threshold": 0.5},
     )
 
 
