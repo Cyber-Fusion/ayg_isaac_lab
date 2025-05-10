@@ -51,6 +51,9 @@ class RewardManager(ManagerBase):
         self._term_names: list[str] = list()
         self._term_cfgs: list[RewardTermCfg] = list()
         self._class_term_cfgs: list[RewardTermCfg] = list()
+        
+        self._reward_type = None
+        self._negative_reward_scale = 1.0
 
         # call the base class constructor (this will parse the terms config)
         super().__init__(cfg, env)
@@ -63,9 +66,7 @@ class RewardManager(ManagerBase):
 
         # Buffer which stores the current step reward for each term for each environment
         self._step_reward = torch.zeros((self.num_envs, len(self._term_names)), dtype=torch.float, device=self.device)
-        
-        self.reward_type = None
-        self.negative_reward_scale = 1.0
+
 
     def __str__(self) -> str:
         """Returns: A string representation for reward manager."""
