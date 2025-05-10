@@ -410,6 +410,10 @@ class RewardsCfg:
     #     params={"command_name": "base_velocity"},
     # )
     
+    def __post_init__(self):
+        self.reward_type = "exp_negative"
+        self.negative_reward_scale = 0.02
+    
 
 @configclass
 class TerminationsCfg:

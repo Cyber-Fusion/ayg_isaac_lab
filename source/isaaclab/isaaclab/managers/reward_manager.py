@@ -63,6 +63,9 @@ class RewardManager(ManagerBase):
 
         # Buffer which stores the current step reward for each term for each environment
         self._step_reward = torch.zeros((self.num_envs, len(self._term_names)), dtype=torch.float, device=self.device)
+        
+        self.reward_type = None
+        self.negative_reward_scale = 1.0
 
     def __str__(self) -> str:
         """Returns: A string representation for reward manager."""
@@ -92,6 +95,43 @@ class RewardManager(ManagerBase):
     def active_terms(self) -> list[str]:
         """Name of active reward terms."""
         return self._term_names
+    
+    @property
+    def reward_type(self) -> str:
+        """Reward type."""
+        if self._reward_type is None:
+            return "classic"
+        return self._reward_type
+    
+    @reward_type.setter
+    def reward_type(self, reward_type: str | None):
+        """Sets the reward type."""
+        if reward_type not in ["classic", "always_positive", "exp_negative"]\
+            and reward_type is not None:
+            raise ValueError(f"Invalid reward type '{reward_type}'.\n Valid entries are 'classic', 'always_positive', and 'exp_negative.")
+        self._reward_type = reward_type
+        
+    @property
+    def negative_reward_scale(self) -> float:
+        """Negative reward scale."""
+        if self._negative_reward_scale is None:
+            return 1.0
+        return self._negative_reward_scale
+    
+    @negative_reward_scale.setter
+    def negative_reward_scale(self, negative_reward_scale: float):
+        """Sets the negative reward scale."""
+        if not isinstance(negative_reward_scale, (float, int)):
+            raise TypeError(
+                f"Negative reward scale is not of type float or int."
+                f" Received: '{type(negative_reward_scale)}'."
+            )
+        if negative_reward_scale <= 0.0:
+            raise ValueError(
+                f"Negative reward scale must be greater than zero."
+                f" Received: '{negative_reward_scale}'."
+            )
+        self._negative_reward_scale = negative_reward_scale
 
     """
     Operations.
@@ -139,28 +179,47 @@ class RewardManager(ManagerBase):
         """
         # reset computation
         self._reward_buf[:] = 0.0
-        positive_reward = torch.zeros_like(self._reward_buf)
-        negative_reward = torch.zeros_like(self._reward_buf)
-        # iterate over all the reward terms
-        for name, term_cfg in zip(self._term_names, self._term_cfgs):
-            # skip if weight is zero (kind of a micro-optimization)
-            if term_cfg.weight == 0.0:
-                continue
-            # compute term's value
-            value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
-            if torch.isnan(value).any() or torch.isinf(value).any():
-                value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
-            positive_reward = torch.clip(value, min=0.0)
-            negative_reward += torch.clip(value, max=0.0)
-            # update total reward
-            self._reward_buf += positive_reward
-            # update episodic sum
-            self._episode_sums[name] += value
+        
+        if self.reward_type in ["classic", "always_positive"]:
+            for name, term_cfg in zip(self._term_names, self._term_cfgs):
+                # skip if weight is zero (kind of a micro-optimization)
+                if term_cfg.weight == 0.0:
+                    continue
+                # compute term's value
+                value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
+                if torch.isnan(value).any() or torch.isinf(value).any():
+                    value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
+                if self.reward_type == "always_positive":
+                    value = torch.clip(value, min=0.0)
+                self._reward_buf += value
+                # update episodic sum
+                self._episode_sums[name] += value
 
-            # Update current reward for this step.
-            self._step_reward[:, self._term_names.index(name)] = value / dt
-            
-        self._reward_buf *= torch.exp(negative_reward / 0.02)
+                # Update current reward for this step.
+                self._step_reward[:, self._term_names.index(name)] = value / dt
+        elif self.reward_type == "exp_negative":
+            positive_reward = torch.zeros_like(self._reward_buf)
+            negative_reward = torch.zeros_like(self._reward_buf)
+            # iterate over all the reward terms
+            for name, term_cfg in zip(self._term_names, self._term_cfgs):
+                # skip if weight is zero (kind of a micro-optimization)
+                if term_cfg.weight == 0.0:
+                    continue
+                # compute term's value
+                value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
+                if torch.isnan(value).any() or torch.isinf(value).any():
+                    value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
+                positive_reward = torch.clip(value, min=0.0)
+                negative_reward += torch.clip(value, max=0.0)
+                # update total reward
+                self._reward_buf += positive_reward
+                # update episodic sum
+                self._episode_sums[name] += value
+
+                # Update current reward for this step.
+                self._step_reward[:, self._term_names.index(name)] = value / dt
+                
+            self._reward_buf *= torch.exp(negative_reward / self.negative_reward_scale)
 
         return self._reward_buf
 
@@ -228,6 +287,13 @@ class RewardManager(ManagerBase):
             cfg_items = self.cfg.__dict__.items()
         # iterate over all the terms
         for term_name, term_cfg in cfg_items:
+            # skip non-reward settins
+            if term_name == 'reward_type':
+                self.reward_type = term_cfg
+                continue
+            if term_name == 'negative_reward_scale':
+                self.negative_reward_scale = term_cfg
+                continue
             # check for non config
             if term_cfg is None:
                 continue
