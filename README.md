@@ -78,10 +78,15 @@ Optional arguments are enclosed within square brackets, i.e. `[]`.
 For single option arguments, the default value is shown after the equal sign.
 For multiple option, the available options are listed within curly brackets, i.e. `{}`.
 
-Train the robot with
-```shell
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-Ayg-{v0, v2} --headless [--max_iterations=300]
-```
+Train the robot with:
+- base training environment:
+  ```shell
+  ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-Velocity-Flat-Ayg-v0 --headless [--max_iterations=300]
+  ```
+- Walk-These-Ways-inspired training environment:
+  ```shell
+  ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-WTW-Flat-Ayg-v0 --headless [--max_iterations=300]
+  ```
 
 Visualize the training performance with
 ```shell

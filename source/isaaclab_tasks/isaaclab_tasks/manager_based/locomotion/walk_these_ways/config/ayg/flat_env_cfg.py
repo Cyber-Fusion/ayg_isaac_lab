@@ -5,6 +5,9 @@
 
 from isaaclab.utils import configclass
 
+from isaaclab_tasks.manager_based.locomotion.walk_these_ways.wtw_params import WalkTheseWaysParams as Params
+Params.height_scanner = None
+
 from .rough_env_cfg import AygRoughWTWEnvCfg
 
 
@@ -39,5 +42,5 @@ class AygFlatWTWEnvCfg_PLAY(AygFlatWTWEnvCfg):
         # disable randomization for play
         self.observations.policy.enable_corruption = False
         # # remove random pushing event
-        # self.events.base_external_force_torque = None
-        # self.events.push_robot = None
+        self.events.base_external_force_torque = None
+        self.events.push_robot = None

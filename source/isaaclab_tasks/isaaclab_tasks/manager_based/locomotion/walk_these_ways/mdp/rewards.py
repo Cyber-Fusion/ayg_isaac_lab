@@ -219,13 +219,13 @@ class FootSwingHeightQuad(GaitRewardQuad):
     def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRLEnv):
         super().__init__(cfg, env)
         
-        self.target_feet_height = cfg.params["target_feet_height"]
+        self.target_height = cfg.params["target_height"]
         
-    def compute_footwing_height(self, desired_contacts):
+    def compute_footswing_height(self, desired_contacts):
         feet_heights = self.asset.data.body_pos_w[:, self.asset_cfg.body_ids, 2]
         
         return torch.sum(
-            torch.square(feet_heights - self.target_feet_height) \
+            torch.square(feet_heights - self.target_height.view(-1, 1)) \
                 * desired_contacts[:, :],
             dim=1
         )
@@ -233,21 +233,30 @@ class FootSwingHeightQuad(GaitRewardQuad):
     def __call__(
         self,
         env: ManagerBasedRLEnv,
+        target_height,
         tracking_contacts_shaped_force,
         tracking_contacts_shaped_vel,
         gait_force_sigma,
         gait_vel_sigma,
         kappa_gait_probs,
         command_name,
-        sensor_cfg,
         asset_cfg,
-        target_feet_height,
+        sensor_cfg,
+        height_scanner_cfg=None,
     ) -> torch.Tensor:
         gait_params = env.command_manager.get_command(self.command_name)
         
+        if height_scanner_cfg is not None:
+            height_scanner: RayCaster = env.scene[height_scanner_cfg.name]
+            # Adjust the target height using the sensor data
+            self.target_height = target_height + torch.mean(height_scanner.data.ray_hits_w[..., 2], dim=1)
+        else:
+            # Use the provided target height directly for flat terrain
+            self.target_height = torch.full((self.num_envs,), target_height, device=self.asset.device)
+        
         desired_contact_states = self.compute_contact_targets(gait_params)
         
-        return self.compute_footwing_height(desired_contact_states)
+        return self.compute_footswing_height(desired_contact_states)
         
     
 class GaitReward(ManagerTermBase):
@@ -542,6 +551,59 @@ def feet_clearance(
 
     return torch.sum(height_error * foot_leteral_vel, dim=1)
 
+def foot_clearance(
+    env: ManagerBasedRLEnv,
+    target_height: float,
+    asset_cfg: SceneEntityCfg,
+    sensor_cfg: SceneEntityCfg | None = None,
+) -> torch.Tensor:
+    """Reward the swinging feet for clearing a specified height off the ground"""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    
+    if sensor_cfg is not None:
+        sensor: RayCaster = env.scene[sensor_cfg.name]
+        # Adjust the target height using the sensor data
+        adjusted_target_height = target_height + torch.mean(sensor.data.ray_hits_w[..., 2], dim=1)
+    else:
+        # Use the provided target height directly for flat terrain
+        adjusted_target_height = target_height
+    
+    foot_z_target_error = torch.square(asset.data.body_pos_w[:, asset_cfg.body_ids, 2] - adjusted_target_height)
+    reward = foot_z_target_error * torch.norm(
+        asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], p=0.5, dim=-1,
+    )
+    return torch.sum(reward, dim=1)
+
+
+def air_time_reward(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    sensor_cfg: SceneEntityCfg,
+    mode_time: float,
+    velocity_threshold: float,
+) -> torch.Tensor:
+    """Reward longer feet air and contact time."""
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    asset: Articulation = env.scene[asset_cfg.name]
+    if contact_sensor.cfg.track_air_time is False:
+        raise RuntimeError("Activate ContactSensor's track_air_time!")
+    # compute the reward
+    current_air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
+    current_contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
+
+    t_max = torch.max(current_air_time, current_contact_time)
+    t_min = torch.clip(t_max, max=mode_time)
+    stance_cmd_reward = torch.clip(current_contact_time - current_air_time, -mode_time, mode_time)
+    cmd = torch.norm(env.command_manager.get_command("base_velocity"), dim=1).unsqueeze(dim=1).expand(-1, 4)
+    body_vel = torch.linalg.norm(asset.data.root_lin_vel_b[:, :2], dim=1).unsqueeze(dim=1).expand(-1, 4)
+    reward = torch.where(
+        torch.logical_or(cmd > 0.0, body_vel > velocity_threshold),
+        torch.where(t_max < mode_time, t_min, 0),
+        stance_cmd_reward,
+    )
+    return torch.sum(reward, dim=1)
+
 
 def feet_air_time(
     env: ManagerBasedRLEnv, command_name: str, sensor_cfg: SceneEntityCfg, threshold: float
@@ -747,14 +809,9 @@ def feet_regulation(
         # Use the provided target height directly for flat terrain
         adjusted_desired_body_height = desired_body_height
 
-    # print("feet_positions_z:", feet_positions_z)
-    # print("adjusted_desired_body_height:", adjusted_desired_body_height)
     exp_term = torch.exp(-feet_positions_z / (0.025 * adjusted_desired_body_height)) # (num_envs, num_feet)
     exp_term = torch.clamp(exp_term, min=0.001, max=10.0)
-    # print("vel_norms_xy:", vel_norms_xy)
-    # print("vel_norms_xy**2:", vel_norms_xy**2)
     r_fr = torch.sum(vel_norms_xy**2 * exp_term, dim=-1)
-    # print("r_fr:", r_fr)
 
     return r_fr
 
@@ -782,30 +839,3 @@ def base_com_height(
         adjusted_target_height = target_height
     # Compute the L2 squared penalty
     return torch.square(asset.data.root_com_pos_w[:, 2] - adjusted_target_height)
-
-
-def base_height_rough_l2(
-    env: ManagerBasedRLEnv,
-    target_height: float,
-    sensor_cfg: SceneEntityCfg | None = None,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-) -> torch.Tensor:
-    """Penalize asset height from its target using L2 squared kernel.
-
-    Note:
-        For flat terrain, target height is in the world frame. For rough terrain,
-        sensor readings can adjust the target height to account for the terrain.
-    """
-
-    # extract the used quantities (to enable type-hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    if sensor_cfg is not None:
-        sensor: RayCaster = env.scene[sensor_cfg.name]
-        # Adjust the target height using the sensor data
-        adjusted_target_height = target_height + torch.mean(sensor.data.ray_hits_w[..., 2], dim=1)
-    else:
-        # Use the provided target height directly for flat terrain
-        adjusted_target_height = target_height
-    
-    # Compute the L2 squared penalty
-    return torch.square(asset.data.root_link_pos_w[:, 2] - adjusted_target_height)

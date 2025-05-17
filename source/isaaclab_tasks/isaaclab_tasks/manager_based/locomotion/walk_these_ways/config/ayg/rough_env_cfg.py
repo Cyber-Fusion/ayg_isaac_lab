@@ -5,6 +5,8 @@
 
 from isaaclab.utils import configclass
 
+from isaaclab_tasks.manager_based.locomotion.walk_these_ways.wtw_params import WalkTheseWaysParams as Params
+
 from isaaclab_tasks.manager_based.locomotion.walk_these_ways.walk_these_ways_env_cfg import LocomotionWalkTheseWaysRoughEnvCfg
 
 ##
@@ -21,15 +23,6 @@ class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
         
         # Switch robot to ayg and rename stuff
         self.scene.robot = AYG_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.events.add_base_mass.params["asset_cfg"].body_names = "Base"
-        self.events.base_external_force_torque.params["asset_cfg"].body_names = "Base"
-        self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Base"
-        # Rename the joints in the rewards
-        self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_Foot"
-        self.rewards.undesired_contacts.params["sensor_cfg"].body_names = [".*_Shank", ".*_Thigh"]
-        self.rewards.base_height_l2.params["asset_cfg"].body_names = "Base"
-        # Rename the joints in the terminations
-        self.terminations.base_contact.params["sensor_cfg"].body_names = ["Base", 'Camera', ".*_Hip"]
         
         # reduce action scale
         self.actions.joint_pos.scale = 0.25
@@ -54,7 +47,7 @@ class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
         self.rewards.track_lin_vel_xy_exp.weight = 1.0
         self.rewards.track_ang_vel_z_exp.weight = 0.5
         
-        self.rewards.lin_vel_z_l2.weight = -4.0e-3
+        self.rewards.lin_vel_z_l2.weight = -2.0e-2
         self.rewards.ang_vel_xy_l2.weight = -2.0e-2
         self.rewards.flat_orientation_l2.weight = -1.0
         

@@ -13,7 +13,7 @@ class AygRoughWTWPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1500
     save_interval = 50
-    experiment_name = "ayg_rough"
+    experiment_name = "ayg_wtw_rough"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
@@ -43,6 +43,6 @@ class AygFlatWTWPPORunnerCfg(AygRoughWTWPPORunnerCfg):
         super().__post_init__()
 
         self.max_iterations = 300
-        self.experiment_name = "ayg_flat"
-        self.policy.actor_hidden_dims = [128, 128, 128]
-        self.policy.critic_hidden_dims = [128, 128, 128]
+        self.experiment_name = "ayg_wtw_flat"
+        self.policy.actor_hidden_dims = [512, 256, 128]
+        self.policy.critic_hidden_dims = [512, 256, 128]
