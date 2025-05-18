@@ -64,7 +64,7 @@ class AygCommandsCfg:
         asset_name="robot",
         resampling_time_range=(10.0, 10.0),
         rel_standing_envs=0.1,
-        rel_heading_envs=0.0,
+        rel_heading_envs=1.0,
         heading_command=True,
         heading_control_stiffness=0.5,
         debug_vis=True,
@@ -319,10 +319,10 @@ class AygFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         super().__post_init__()
 
         # general settings
-        self.decimation = 10  # 50 Hz
+        self.decimation = 4  # 50 Hz
         self.episode_length_s = 20.0
         # simulation settings
-        self.sim.dt = 0.002  # 500 Hz
+        self.sim.dt = 0.005  # 200 Hz
         self.sim.render_interval = self.decimation
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
