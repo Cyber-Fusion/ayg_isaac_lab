@@ -27,6 +27,10 @@ class UniformGaitCommandCfgQuad(CommandTermCfg):
         """Range for phase offsets [0-1]."""
         offsets4: tuple[float, float] = MISSING
         """Range for phase offsets [0-1]."""
+        feet_height: tuple[float, float] = MISSING
+        """Range for feet height [m]."""
+        base_height: tuple[float, float] = MISSING
+        """Range for base height [m]."""
 
 
     ranges: Ranges = MISSING

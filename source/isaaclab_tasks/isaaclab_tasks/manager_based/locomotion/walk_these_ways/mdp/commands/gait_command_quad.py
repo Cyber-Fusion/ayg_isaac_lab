@@ -31,7 +31,7 @@ class GaitCommandQuad(CommandTerm):
 
         # create buffers to store the command
         # command format: [frequency, contact duration, phase offset2, phase offset3, phase offset4]
-        self.gait_command = torch.zeros(self.num_envs, 5, device=self.device)
+        self.gait_command = torch.zeros(self.num_envs, 7, device=self.device)
         # create metrics dictionary for logging
         self.metrics = {}
 
@@ -44,7 +44,7 @@ class GaitCommandQuad(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
-        """The gait command. Shape is (num_envs, 5)."""
+        """The gait command. Shape is (num_envs, 7)."""
         return self.gait_command
 
     def _update_metrics(self):
@@ -68,6 +68,10 @@ class GaitCommandQuad(CommandTerm):
         self.gait_command[env_ids, 3] = r.uniform_(*self.cfg.ranges.offsets3)
         # -- phase offset4
         self.gait_command[env_ids, 4] = r.uniform_(*self.cfg.ranges.offsets4)
+        # -- feet height
+        self.gait_command[env_ids, 5] = r.uniform_(*self.cfg.ranges.feet_height)
+        # -- base height
+        self.gait_command[env_ids, 6] = r.uniform_(*self.cfg.ranges.base_height)
 
 
     def _update_command(self):

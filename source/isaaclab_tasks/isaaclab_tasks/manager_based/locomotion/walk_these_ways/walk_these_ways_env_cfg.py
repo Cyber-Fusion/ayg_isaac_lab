@@ -102,13 +102,15 @@ class CommandsCfg:
             offsets2=(0.5, 0.5),  # Phase offsets2 range [0-1]
             offsets3=(0.5, 0.5),  # Phase offsets3 range [0-1]
             offsets4=(0.0, 0.0),  # Phase offsets4 range [0-1]
+            feet_height=(0.12, 0.12),
+            base_height=(0.40, 0.40),
         ),
     )
 
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(10.0, 10.0),
-        rel_standing_envs=0.02,
+        rel_standing_envs=0.1,
         rel_heading_envs=1.0,
         heading_command=True,
         heading_control_stiffness=0.5,
@@ -135,7 +137,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
+        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
@@ -157,43 +159,42 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
-            self.history_length = 3
+            self.history_length = 5
             self.flatten_history_dim = True
 
-    # @configclass
-    # class CriticCfg(ObsGroup):
-    #     """Observations for critic group."""
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for critic group."""
         
-    #     # observation terms (order preserved)
-    #     # observation terms (order preserved)
-    #     base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
-    #     base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-    #     projected_gravity = ObsTerm(
-    #         func=mdp.projected_gravity,
-    #         noise=Unoise(n_min=-0.05, n_max=0.05),
-    #     )
-    #     velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-    #     gait_phase = ObsTerm(func=mdp.get_gait_phase)
-    #     gait_command = ObsTerm(func=mdp.get_gait_command, params={"command_name": "gait_command"})
-    #     joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-    #     joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
-    #     actions = ObsTerm(func=mdp.last_action)
-    #     height_scan = ObsTerm(
-    #         func=mdp.height_scan,
-    #         params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-    #         noise=Unoise(n_min=-0.1, n_max=0.1),
-    #         clip=(-1.0, 1.0),
-    #     )
+        # observation terms (order preserved)
+        # observation terms (order preserved)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+        )
+        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        gait_phase = ObsTerm(func=mdp.get_gait_phase)
+        gait_command = ObsTerm(func=mdp.get_gait_command, params={"command_name": "gait_command"})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        actions = ObsTerm(func=mdp.last_action)
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+            clip=(-1.0, 1.0),
+        )
 
-    #     def __post_init__(self):
-    #         self.enable_corruption = True
-    #         self.concatenate_terms = True
-    #         self.history_length = 5
-    #         self.flatten_history_dim = True
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+            self.history_length = 5
+            self.flatten_history_dim = True
         
     # observation groups
     policy: PolicyCfg = PolicyCfg()
-    # critic: CriticCfg = CriticCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -331,7 +332,6 @@ class RewardsCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=Params.base_name),
             "sensor_cfg": Params.height_scanner,
-            "target_height": 0.5,
         }
     )
     
@@ -341,7 +341,6 @@ class RewardsCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=Params.feet_names),
             "sensor_cfg": Params.height_scanner,
-            "target_height": 0.12,
         },
     )
     
