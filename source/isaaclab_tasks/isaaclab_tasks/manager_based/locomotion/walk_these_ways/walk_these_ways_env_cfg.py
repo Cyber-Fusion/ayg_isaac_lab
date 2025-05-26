@@ -102,8 +102,8 @@ class CommandsCfg:
             offsets2=(0.5, 0.5),  # Phase offsets2 range [0-1]
             offsets3=(0.5, 0.5),  # Phase offsets3 range [0-1]
             offsets4=(0.0, 0.0),  # Phase offsets4 range [0-1]
-            feet_height=(0.12, 0.12),
-            base_height=(0.40, 0.40),
+            feet_height=(0.05, 0.20),
+            base_height=(0.30, 0.40),
         ),
     )
 
@@ -116,7 +116,7 @@ class CommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-0.0, 0.0), heading=(-math.pi, math.pi)
         ),
     )
 
@@ -159,8 +159,8 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
-            self.history_length = 5
-            self.flatten_history_dim = True
+            # self.history_length = 1
+            # self.flatten_history_dim = True
 
     @configclass
     class CriticCfg(ObsGroup):
@@ -189,8 +189,8 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = True
-            self.history_length = 5
-            self.flatten_history_dim = True
+            # self.history_length = 1
+            # self.flatten_history_dim = True
         
     # observation groups
     policy: PolicyCfg = PolicyCfg()
@@ -344,6 +344,16 @@ class RewardsCfg:
         },
     )
     
+    foot_clearance = RewTerm(
+        func=mdp.foot_clearance_reward,
+        weight=0.0,
+        params={
+            "std": 0.05,
+            "tanh_mult": 2.0,
+            "asset_cfg": SceneEntityCfg("robot", body_names=Params.feet_names),
+        },
+    )
+    
     feet_slip = RewTerm(
         func=mdp.feet_slide,
         weight=-0.0,
@@ -376,6 +386,18 @@ class RewardsCfg:
     )
     
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
+    
+    stand_when_zero_command = RewTerm(
+        func=mdp.stand_when_zero_command,
+        weight=-0.0,
+        params={"command_name": "base_velocity"},
+    )
+    
+    stand_still_when_zero_command = RewTerm(
+        func=mdp.stand_still_when_zero_command,
+        weight=-0.0,
+        params={"command_name": "base_velocity"},
+    )
     
     # ======================================================================= #
     

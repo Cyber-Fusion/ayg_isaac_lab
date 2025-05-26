@@ -41,29 +41,6 @@ def feet_slide(env, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = Scen
     return reward
 
 
-def track_lin_vel_xy_yaw_frame_exp(
-    env, std: float, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
-    """Reward tracking of linear velocity commands (xy axes) in the gravity aligned robot frame using exponential kernel."""
-    # extract the used quantities (to enable type-hinting)
-    asset = env.scene[asset_cfg.name]
-    vel_yaw = quat_rotate_inverse(yaw_quat(asset.data.root_quat_w), asset.data.root_lin_vel_w[:, :3])
-    lin_vel_error = torch.sum(
-        torch.square(env.command_manager.get_command(command_name)[:, :2] - vel_yaw[:, :2]), dim=1
-    )
-    return torch.exp(-lin_vel_error / std**2)
-
-
-def track_ang_vel_z_world_exp(
-    env, command_name: str, std: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
-    """Reward tracking of angular velocity commands (yaw) in world frame using exponential kernel."""
-    # extract the used quantities (to enable type-hinting)
-    asset = env.scene[asset_cfg.name]
-    ang_vel_error = torch.square(env.command_manager.get_command(command_name)[:, 2] - asset.data.root_ang_vel_w[:, 2])
-    return torch.exp(-ang_vel_error / std**2)
-
-
 class GaitRewardQuad(ManagerTermBase):
     def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRLEnv):
         """Initialize the term.
@@ -73,6 +50,8 @@ class GaitRewardQuad(ManagerTermBase):
             env: The RL environment instance.
         """
         super().__init__(cfg, env)
+
+        self.env = env
 
         self.sensor_cfg = cfg.params["sensor_cfg"]
         self.asset_cfg = cfg.params["asset_cfg"]
@@ -131,6 +110,10 @@ class GaitRewardQuad(ManagerTermBase):
 
         # Combine rewards
         total_reward = force_reward + velocity_reward
+        
+        cmd_not_null = env.command_manager.get_command("base_velocity").norm(p=1, dim=1) > 0.05
+        
+        total_reward = total_reward * cmd_not_null
         return total_reward
 
     def compute_contact_targets(self, gait_params):
@@ -227,11 +210,13 @@ class FootSwingHeightQuad(GaitRewardQuad):
         
         feet_heights = self.asset.data.body_pos_w[:, self.asset_cfg.body_ids, 2]
         
+        cmd_not_null = self.env.command_manager.get_command("base_velocity").norm(p=1, dim=1) > 0.05
+        
         return torch.sum(
             torch.square(feet_heights - cmd_height) \
                 * desired_contacts[:, :],
             dim=1
-        )
+        ) * cmd_not_null
         
     def __call__(
         self,
@@ -608,6 +593,24 @@ def foot_clearance(
     return torch.sum(reward, dim=1)
 
 
+def foot_clearance_reward(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, std: float, tanh_mult: float
+) -> torch.Tensor:
+    """Reward the swinging feet for clearing a specified height off the ground"""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    
+    commands = env.command_manager.get_command("gait_command")
+    cmd_height = commands[:, 5].unsqueeze(1)
+    
+    foot_z_target_error = torch.square(asset.data.body_pos_w[:, asset_cfg.body_ids, 2] - cmd_height)
+    foot_velocity_tanh = torch.tanh(tanh_mult * torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2))
+    reward = foot_z_target_error * foot_velocity_tanh
+    
+    cmd_not_null = env.command_manager.get_command("base_velocity").norm(p=1, dim=1) > 0.05
+    
+    return torch.exp(-torch.sum(reward, dim=1) / std) * cmd_not_null
+
+
 def air_time_reward(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg,
@@ -774,17 +777,34 @@ def stand_still(
     return total_reward
 
 
+def stand_when_zero_command(
+    env, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize joint positions that deviate from the default one when no command."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    diff_angle = asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]
+    
+    cmd_null = env.command_manager.get_command("base_velocity").norm(dim=1, p=1) < 0.05
+
+    return (
+        torch.norm(diff_angle, p=1, dim=1)
+    ) * cmd_null
+
+
 def stand_still_when_zero_command(
     env, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
     """Penalize joint positions that deviate from the default one when no command."""
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
-    # compute out of limits constraints
-    diff_angle = asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]
-    command = torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) < 0.1
-    return torch.sum(torch.abs(diff_angle), dim=1) * command
+    joint_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
+    
+    cmd_null = env.command_manager.get_command("base_velocity").norm(dim=1, p=1) < 0.05
 
+    return (
+        torch.norm(joint_vel, p=1, dim=1)
+    ) * cmd_null
 
 
 # def feet_regulation(
@@ -847,28 +867,3 @@ def feet_regulation(
     r_fr = torch.sum(vel_norms_xy**2 * exp_term, dim=-1)
 
     return r_fr
-
-
-def base_com_height(
-    env: ManagerBasedRLEnv,
-    target_height: float,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    sensor_cfg: SceneEntityCfg | None = None,
-) -> torch.Tensor:
-    """Penalize asset height from its target using L2 squared kernel.
-
-    Note:
-        For flat terrain, target height is in the world frame. For rough terrain,
-        sensor readings can adjust the target height to account for the terrain.
-    """
-    # extract the used quantities (to enable type-hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    if sensor_cfg is not None:
-        sensor: RayCaster = env.scene[sensor_cfg.name]
-        # Adjust the target height using the sensor data
-        adjusted_target_height = target_height + sensor.data.pos_w[:, 2]
-    else:
-        # Use the provided target height directly for flat terrain
-        adjusted_target_height = target_height
-    # Compute the L2 squared penalty
-    return torch.square(asset.data.root_com_pos_w[:, 2] - adjusted_target_height)

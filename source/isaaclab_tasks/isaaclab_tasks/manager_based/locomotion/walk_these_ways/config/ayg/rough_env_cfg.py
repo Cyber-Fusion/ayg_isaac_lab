@@ -66,6 +66,10 @@ class AygRoughWTWEnvCfg(LocomotionWalkTheseWaysRoughEnvCfg):
         
         self.rewards.gait.weight = 0.5
         self.rewards.footswing_height.weight = -5.0
+        self.rewards.foot_clearance.weight = 0.0
+        
+        self.rewards.stand_when_zero_command.weight = -0.01
+        self.rewards.stand_still_when_zero_command.weight = -0.01
         
         # Commands
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
