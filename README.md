@@ -2,6 +2,8 @@
 
 Ayg Isaac Lab is a fork of [Isaac Lab](https://isaac-sim.github.io/IsaacLab) that is tailored for training the Ayg robot.
 
+A guide on how to use Isaac Lab for RL is available in [guide.md](guide.md).
+
 ## Table of Contents
 
 - [Ayg Isaac Lab](#ayg-isaac-lab)
