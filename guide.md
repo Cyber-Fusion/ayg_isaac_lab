@@ -39,3 +39,5 @@ The `config` folder collects the specific configurations for the various robots,
 
 Both the `direct` and `manager_based` implementations build upon the code implemented in `source/isaaclab/isaaclab`, which contains, among others, specifications on the envs, managers (for commands, observations, and rewards), and other stuff.
 Seeing their implementation is sometimes useful to understand what is happening.
+
+Both in the `direct` and `manager_based` implementations, new RL environments are registered through the `__init__.py` file in the `config/<robot_name>` folder.
