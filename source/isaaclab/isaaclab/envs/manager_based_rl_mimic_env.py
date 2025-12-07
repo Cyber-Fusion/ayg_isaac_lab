@@ -1,13 +1,20 @@
-# Copyright (c) 2024-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
 
 import torch
 from collections.abc import Sequence
 
 import isaaclab.utils.math as PoseUtils
 from isaaclab.envs import ManagerBasedRLEnv
+
+
+def optional_method(func):
+    """Decorator to mark a method as optional."""
+    func.__is_optional__ = True
+    return func
 
 
 class ManagerBasedRLMimicEnv(ManagerBasedRLEnv):
@@ -47,7 +54,11 @@ class ManagerBasedRLMimicEnv(ManagerBasedRLEnv):
         raise NotImplementedError
 
     def target_eef_pose_to_action(
-        self, target_eef_pose_dict: dict, gripper_action_dict: dict, noise: float | None = None, env_id: int = 0
+        self,
+        target_eef_pose_dict: dict,
+        gripper_action_dict: dict,
+        action_noise_dict: dict | None = None,
+        env_id: int = 0,
     ) -> torch.Tensor:
         """
         Takes a target pose and gripper action for the end effector controller and returns an action
@@ -57,7 +68,7 @@ class ManagerBasedRLMimicEnv(ManagerBasedRLEnv):
         Args:
             target_eef_pose_dict: Dictionary of 4x4 target eef pose for each end-effector.
             gripper_action_dict: Dictionary of gripper actions for each end-effector.
-            noise: Noise to add to the action. If None, no noise is added.
+            action_noise_dict: Noise to add to the action. If None, no noise is added.
             env_id: Environment index to compute the action for.
 
         Returns:
@@ -112,6 +123,22 @@ class ManagerBasedRLMimicEnv(ManagerBasedRLEnv):
             )
         return object_pose_matrix
 
+    def get_subtask_start_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
+        """
+        Gets a dictionary of start signal flags for each subtask in a task. The flag is 1
+        when the subtask has started and 0 otherwise. The implementation of this method is
+        required if intending to enable automatic subtask start signal annotation when running the
+        dataset annotation tool. This method can be kept unimplemented if intending to use manual
+        subtask start signal annotation.
+
+        Args:
+            env_ids: Environment indices to get the start signals for. If None, all envs are considered.
+
+        Returns:
+            A dictionary start signal flags (False or True) for each subtask.
+        """
+        raise NotImplementedError
+
     def get_subtask_term_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
         """
         Gets a dictionary of termination signal flags for each subtask in a task. The flag is 1
@@ -135,3 +162,21 @@ class ManagerBasedRLMimicEnv(ManagerBasedRLEnv):
         and used in utils/env_utils.py.
         """
         return dict(env_name=self.spec.id, type=2, env_kwargs=dict())
+
+    @optional_method
+    def get_navigation_state(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
+        """
+        Optional method. Only required when using navigation controller locomanipulation data generation.
+
+        Gets the navigation state of the robot. Required when use of the navigation controller is
+        enabled. The navigation state includes a boolean flag "is_navigating" to indicate when the
+        robot is under control by the navigation controller, and a boolean flag "navigation_goal_reached"
+        to indicate when the navigation goal has been reached.
+
+        Args:
+            env_ids: The environment index to get the navigation state for. If None, all envs are considered.
+
+        Returns:
+            A dictionary that of navigation state flags (False or True).
+        """
+        raise NotImplementedError

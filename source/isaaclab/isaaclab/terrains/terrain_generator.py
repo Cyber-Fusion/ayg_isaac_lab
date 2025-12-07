@@ -1,24 +1,31 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
+
+import logging
 import numpy as np
 import os
 import torch
 import trimesh
-
-import omni.log
+from typing import TYPE_CHECKING
 
 from isaaclab.utils.dict import dict_to_md5_hash
 from isaaclab.utils.io import dump_yaml
 from isaaclab.utils.timer import Timer
 from isaaclab.utils.warp import convert_to_warp_mesh
 
-from .height_field import HfTerrainBaseCfg
-from .terrain_generator_cfg import FlatPatchSamplingCfg, SubTerrainBaseCfg, TerrainGeneratorCfg
 from .trimesh.utils import make_border
 from .utils import color_meshes_by_height, find_flat_patches
+
+if TYPE_CHECKING:
+    from .sub_terrain_cfg import FlatPatchSamplingCfg, SubTerrainBaseCfg
+    from .terrain_generator_cfg import TerrainGeneratorCfg
+
+# import logger
+logger = logging.getLogger(__name__)
 
 
 class TerrainGenerator:
@@ -108,6 +115,8 @@ class TerrainGenerator:
         self.device = device
 
         # set common values to all sub-terrains config
+        from .height_field import HfTerrainBaseCfg  # prevent circular import
+
         for sub_cfg in self.cfg.sub_terrains.values():
             # size of all terrains
             sub_cfg.size = self.cfg.size
@@ -119,7 +128,7 @@ class TerrainGenerator:
 
         # throw a warning if the cache is enabled but the seed is not set
         if self.cfg.use_cache and self.cfg.seed is None:
-            omni.log.warn(
+            logger.warning(
                 "Cache is enabled but the seed is not set. The terrain generation will not be reproducible."
                 " Please set the seed in the terrain generator configuration to make the generation reproducible."
             )
@@ -271,7 +280,7 @@ class TerrainGenerator:
             -self.cfg.border_height / 2,
         )
         # border mesh
-        border_meshes = make_border(border_size, inner_size, height=self.cfg.border_height, position=border_center)
+        border_meshes = make_border(border_size, inner_size, height=abs(self.cfg.border_height), position=border_center)
         border = trimesh.util.concatenate(border_meshes)
         # update the faces to have minimal triangles
         selector = ~(np.asarray(border.triangles)[:, :, 2] < -0.1).any(1)
@@ -295,7 +304,7 @@ class TerrainGenerator:
         """
         # sample flat patches if specified
         if sub_terrain_cfg.flat_patch_sampling is not None:
-            omni.log.info(f"Sampling flat patches for sub-terrain at (row, col):  ({row}, {col})")
+            logger.info(f"Sampling flat patches for sub-terrain at (row, col):  ({row}, {col})")
             # convert the mesh to warp mesh
             wp_mesh = convert_to_warp_mesh(mesh.vertices, mesh.faces, device=self.device)
             # sample flat patches based on each patch configuration for that sub-terrain
