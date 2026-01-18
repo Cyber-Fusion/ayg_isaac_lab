@@ -22,6 +22,28 @@ from isaaclab.utils.math import quat_rotate_inverse, yaw_quat
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
     from isaaclab.managers import RewardTermCfg
+    
+
+def track_base_height_exp(
+    env: ManagerBasedRLEnv, std: float, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+):
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject = env.scene[asset_cfg.name]
+    
+    commands = env.command_manager.get_command("gait_command")
+    cmd_base_height = commands[:, 6]
+    
+    if sensor_cfg is not None:
+        sensor: RayCaster = env.scene[sensor_cfg.name]
+        # Adjust the target height using the sensor data
+        adjusted_target_height = cmd_base_height + torch.mean(sensor.data.ray_hits_w[..., 2], dim=1)
+    else:
+        # Use the provided target height directly for flat terrain
+        adjusted_target_height = cmd_base_height
+    
+    base_height_error = asset.data.root_pos_w[:, 2] - adjusted_target_height
+    
+    return torch.exp(- torch.square(base_height_error) / std**2)
 
 
 def feet_slide(env, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
@@ -405,7 +427,6 @@ class ActionSmoothnessPenalty(ManagerTermBase):
         self.dt = env.step_dt
         self.prev_prev_action = None
         self.prev_action = None
-        self.__name__ = "action_smoothness_penalty"
 
     def __call__(self, env: ManagerBasedRLEnv) -> torch.Tensor:
         """Compute the action smoothness penalty.

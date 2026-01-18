@@ -1,4 +1,4 @@
-[submodule "source/isaaclab_assets/data/Robots/ayg"]
-	path = source/isaaclab_assets/data/Robots/ayg
+[submodule "source/isaaclab_assets/data/Robots/ayg_description"]
+	path = source/isaaclab_assets/data/Robots/ayg_description
 	url = git@github.com:Cyber-Fusion/ayg_description.git
-	branch = usd
+	branch = ros2
