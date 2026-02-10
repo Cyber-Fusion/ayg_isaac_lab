@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -14,20 +14,20 @@ import re
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-import omni
+import torch
+
 import omni.kit.commands
 import omni.usd
-import usdrt  # noqa: F401
 from isaacsim.core.cloner import Cloner
-from omni.usd.commands import DeletePrimsCommand, MovePrimCommand
-from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
+from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade, UsdUtils
 
 from isaaclab.utils.string import to_camel_case
 from isaaclab.utils.version import get_isaac_sim_version
 
 from .queries import find_matching_prim_paths
 from .semantics import add_labels
-from .stage import attach_stage_to_usd_context, get_current_stage, get_current_stage_id
+from .stage import get_current_stage, get_current_stage_id
+from .transforms import convert_world_pose_to_local, standardize_xform_ops
 
 if TYPE_CHECKING:
     from isaaclab.sim.spawners.spawner_cfg import SpawnerCfg
@@ -44,10 +44,10 @@ General Utils
 def create_prim(
     prim_path: str,
     prim_type: str = "Xform",
-    position: Sequence[float] | None = None,
-    translation: Sequence[float] | None = None,
-    orientation: Sequence[float] | None = None,
-    scale: Sequence[float] | None = None,
+    position: Any | None = None,
+    translation: Any | None = None,
+    orientation: Any | None = None,
+    scale: Any | None = None,
     usd_path: str | None = None,
     semantic_label: str | None = None,
     semantic_type: str = "class",
@@ -57,40 +57,85 @@ def create_prim(
     """Creates a prim in the provided USD stage.
 
     The method applies the specified transforms, the semantic label and sets the specified attributes.
+    The transform can be specified either in world space (using ``position``) or local space (using
+    ``translation``).
+
+    The function determines the coordinate system of the transform based on the provided arguments.
+
+    * If ``position`` is provided, it is assumed the orientation is provided in the world frame as well.
+    * If ``translation`` is provided, it is assumed the orientation is provided in the local frame as well.
+
+    The scale is always applied in the local frame.
+
+    The function handles various sequence types (list, tuple, numpy array, torch tensor)
+    and converts them to properly-typed tuples for operations on the prim.
+
+    .. note::
+        Transform operations are standardized to the USD convention: translate, orient (quaternion),
+        and scale, in that order. See :func:`standardize_xform_ops` for more details.
 
     Args:
-        prim_path: The path of the new prim.
-        prim_type: Prim type name
-        position: prim position (applied last)
-        translation: prim translation (applied last)
-        orientation: prim rotation as quaternion
-        scale: scaling factor in x, y, z.
-        usd_path: Path to the USD that this prim will reference.
-        semantic_label: Semantic label.
-        semantic_type: set to "class" unless otherwise specified.
-        attributes: Key-value pairs of prim attributes to set.
-        stage: The stage to create the prim in. Defaults to None, in which case the current stage is used.
+        prim_path:
+            The path of the new prim.
+        prim_type:
+            Prim type name. Defaults to "Xform", in which case a simple Xform prim is created.
+        position:
+            Prim position in world space as (x, y, z). If the prim has a parent, this is
+            automatically converted to local space relative to the parent. Cannot be used with
+            ``translation``. Defaults to None, in which case no position is applied.
+        translation:
+            Prim translation in local space as (x, y, z). This is applied directly without
+            any coordinate transformation. Cannot be used with ``position``. Defaults to None,
+            in which case no translation is applied.
+        orientation:
+            Prim rotation as a quaternion (w, x, y, z). When used with ``position``, the
+            orientation is also converted from world space to local space. When used with ``translation``,
+            it is applied directly as local orientation. Defaults to None.
+        scale:
+            Scaling factor in x, y, z. Applied in local space. Defaults to None,
+            in which case a uniform scale of 1.0 is applied.
+        usd_path:
+            Path to the USD file that this prim will reference. Defaults to None.
+        semantic_label:
+            Semantic label to apply to the prim. Defaults to None, in which case no label is added.
+        semantic_type:
+            Semantic type for the label. Defaults to "class".
+        attributes:
+            Key-value pairs of prim attributes to set. Defaults to None, in which case no attributes are set.
+        stage:
+            The stage to create the prim in. Defaults to None, in which case the current stage is used.
 
     Returns:
         The created USD prim.
 
     Raises:
-        ValueError: If there is already a prim at the provided prim_path.
+        ValueError: If there is already a prim at the provided prim path.
+        ValueError: If both position and translation are provided.
 
     Example:
         >>> import isaaclab.sim as sim_utils
         >>>
-        >>> # create a cube (/World/Cube) of size 2 centered at (1.0, 0.5, 0.0)
+        >>> # Create a cube at world position (1.0, 0.5, 0.0)
         >>> sim_utils.create_prim(
-        ...     prim_path="/World/Cube",
+        ...     prim_path="/World/Parent/Cube",
         ...     prim_type="Cube",
         ...     position=(1.0, 0.5, 0.0),
-        ...     attributes={"size": 2.0}
+        ...     attributes={"size": 2.0},
         ... )
-        Usd.Prim(</World/Cube>)
+        Usd.Prim(</World/Parent/Cube>)
+        >>>
+        >>> # Create a sphere with local translation relative to its parent
+        >>> sim_utils.create_prim(
+        ...     prim_path="/World/Parent/Sphere",
+        ...     prim_type="Sphere",
+        ...     translation=(0.5, 0.0, 0.0),
+        ...     scale=(2.0, 2.0, 2.0),
+        ... )
+        Usd.Prim(</World/Parent/Sphere>)
     """
-    # Note: Imported here to prevent cyclic dependency in the module.
-    from isaacsim.core.prims import XFormPrim
+    # Ensure that user doesn't provide both position and translation
+    if position is not None and translation is not None:
+        raise ValueError("Cannot provide both position and translation. Please provide only one.")
 
     # obtain stage handle
     stage = get_current_stage() if stage is None else stage
@@ -114,37 +159,43 @@ def create_prim(
     if semantic_label is not None:
         add_labels(prim, labels=[semantic_label], instance_name=semantic_type)
 
-    # apply the transformations
-    from isaacsim.core.api.simulation_context.simulation_context import SimulationContext
+    # check if prim type is Xformable
+    if not prim.IsA(UsdGeom.Xformable):
+        logger.debug(
+            f"Prim at path '{prim.GetPath().pathString}' is of type '{prim.GetTypeName()}', "
+            "which is not an Xformable. Transform operations will not be standardized. "
+            "This is expected for material, shader, and scope prims."
+        )
+        return prim
 
-    if SimulationContext.instance() is None:
-        # FIXME: remove this, we should never even use backend utils  especially not numpy ones
-        import isaacsim.core.utils.numpy as backend_utils
+    # convert input arguments to tuples
+    position = _to_tuple(position) if position is not None else None
+    translation = _to_tuple(translation) if translation is not None else None
+    orientation = _to_tuple(orientation) if orientation is not None else None
+    scale = _to_tuple(scale) if scale is not None else None
 
-        device = "cpu"
-    else:
-        backend_utils = SimulationContext.instance().backend_utils
-        device = SimulationContext.instance().device
+    # convert position and orientation to translation and orientation
+    # world --> local
     if position is not None:
-        position = backend_utils.expand_dims(backend_utils.convert(position, device), 0)
-    if translation is not None:
-        translation = backend_utils.expand_dims(backend_utils.convert(translation, device), 0)
-    if orientation is not None:
-        orientation = backend_utils.expand_dims(backend_utils.convert(orientation, device), 0)
-    if scale is not None:
-        scale = backend_utils.expand_dims(backend_utils.convert(scale, device), 0)
-    XFormPrim(prim_path, positions=position, translations=translation, orientations=orientation, scales=scale)
+        # this means that user provided pose in the world frame
+        translation, orientation = convert_world_pose_to_local(position, orientation, ref_prim=prim.GetParent())
+
+    # standardize the xform ops
+    standardize_xform_ops(prim, translation, orientation, scale)
 
     return prim
 
 
-def delete_prim(prim_path: str | Sequence[str], stage: Usd.Stage | None = None) -> None:
+def delete_prim(prim_path: str | Sequence[str], stage: Usd.Stage | None = None) -> bool:
     """Removes the USD Prim and its descendants from the scene if able.
 
     Args:
         prim_path: The path of the prim to delete. If a list of paths is provided,
             the function will delete all the prims in the list.
         stage: The stage to delete the prim in. Defaults to None, in which case the current stage is used.
+
+    Returns:
+        True if the prim or prims were deleted successfully, False otherwise.
 
     Example:
         >>> import isaaclab.sim as sim_utils
@@ -156,11 +207,24 @@ def delete_prim(prim_path: str | Sequence[str], stage: Usd.Stage | None = None) 
         prim_path = [prim_path]
     # get stage handle
     stage = get_current_stage() if stage is None else stage
+    # FIXME: We should not need to cache the stage here. It should
+    # happen at the creation of the stage.
+    # the prim command looks for the stage ID in the stage cache
+    # so we need to ensure the stage is cached
+    stage_cache = UsdUtils.StageCache.Get()
+    stage_id = stage_cache.GetId(stage).ToLongInt()
+    if stage_id < 0:
+        stage_id = stage_cache.Insert(stage).ToLongInt()
     # delete prims
-    DeletePrimsCommand(prim_path, stage=stage).do()
+    success, _ = omni.kit.commands.execute(
+        "DeletePrimsCommand",
+        paths=prim_path,
+        stage=stage,
+    )
+    return success
 
 
-def move_prim(path_from: str, path_to: str, keep_world_transform: bool = True, stage: Usd.Stage | None = None) -> None:
+def move_prim(path_from: str, path_to: str, keep_world_transform: bool = True, stage: Usd.Stage | None = None) -> bool:
     """Moves a prim from one path to another within a USD stage.
 
     This function moves the prim from the source path to the destination path. If the :attr:`keep_world_transform`
@@ -178,6 +242,9 @@ def move_prim(path_from: str, path_to: str, keep_world_transform: bool = True, s
         keep_world_transform: Whether to keep the world transform of the prim. Defaults to True.
         stage: The stage to move the prim in. Defaults to None, in which case the current stage is used.
 
+    Returns:
+        True if the prim was moved successfully, False otherwise.
+
     Example:
         >>> import isaaclab.sim as sim_utils
         >>>
@@ -187,9 +254,14 @@ def move_prim(path_from: str, path_to: str, keep_world_transform: bool = True, s
     # get stage handle
     stage = get_current_stage() if stage is None else stage
     # move prim
-    MovePrimCommand(
-        path_from=path_from, path_to=path_to, keep_world_transform=keep_world_transform, stage_or_context=stage
-    ).do()
+    success, _ = omni.kit.commands.execute(
+        "MovePrimCommand",
+        path_from=path_from,
+        path_to=path_to,
+        keep_world_transform=keep_world_transform,
+        stage_or_context=stage,
+    )
+    return success
 
 
 """
@@ -238,97 +310,6 @@ def make_uninstanceable(prim_path: str | Sdf.Path, stage: Usd.Stage | None = Non
             child_prim.SetInstanceable(False)
         # add children to list
         all_prims += child_prim.GetFilteredChildren(Usd.TraverseInstanceProxies())
-
-
-def resolve_prim_pose(
-    prim: Usd.Prim, ref_prim: Usd.Prim | None = None
-) -> tuple[tuple[float, float, float], tuple[float, float, float, float]]:
-    """Resolve the pose of a prim with respect to another prim.
-
-    Note:
-        This function ignores scale and skew by orthonormalizing the transformation
-        matrix at the final step. However, if any ancestor prim in the hierarchy
-        has non-uniform scale, that scale will still affect the resulting position
-        and orientation of the prim (because it's baked into the transform before
-        scale removal).
-
-        In other words: scale **is not removed hierarchically**. If you need
-        completely scale-free poses, you must walk the transform chain and strip
-        scale at each level. Please open an issue if you need this functionality.
-
-    Args:
-        prim: The USD prim to resolve the pose for.
-        ref_prim: The USD prim to compute the pose with respect to.
-            Defaults to None, in which case the world frame is used.
-
-    Returns:
-        A tuple containing the position (as a 3D vector) and the quaternion orientation
-        in the (w, x, y, z) format.
-
-    Raises:
-        ValueError: If the prim or ref prim is not valid.
-    """
-    # check if prim is valid
-    if not prim.IsValid():
-        raise ValueError(f"Prim at path '{prim.GetPath().pathString}' is not valid.")
-    # get prim xform
-    xform = UsdGeom.Xformable(prim)
-    prim_tf = xform.ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-    # sanitize quaternion
-    # this is needed, otherwise the quaternion might be non-normalized
-    prim_tf = prim_tf.GetOrthonormalized()
-
-    if ref_prim is not None:
-        # check if ref prim is valid
-        if not ref_prim.IsValid():
-            raise ValueError(f"Ref prim at path '{ref_prim.GetPath().pathString}' is not valid.")
-        # get ref prim xform
-        ref_xform = UsdGeom.Xformable(ref_prim)
-        ref_tf = ref_xform.ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-        # make sure ref tf is orthonormal
-        ref_tf = ref_tf.GetOrthonormalized()
-        # compute relative transform to get prim in ref frame
-        prim_tf = prim_tf * ref_tf.GetInverse()
-
-    # extract position and orientation
-    prim_pos = [*prim_tf.ExtractTranslation()]
-    prim_quat = [prim_tf.ExtractRotationQuat().real, *prim_tf.ExtractRotationQuat().imaginary]
-    return tuple(prim_pos), tuple(prim_quat)
-
-
-def resolve_prim_scale(prim: Usd.Prim) -> tuple[float, float, float]:
-    """Resolve the scale of a prim in the world frame.
-
-    At an attribute level, a USD prim's scale is a scaling transformation applied to the prim with
-    respect to its parent prim. This function resolves the scale of the prim in the world frame,
-    by computing the local to world transform of the prim. This is equivalent to traversing up
-    the prim hierarchy and accounting for the rotations and scales of the prims.
-
-    For instance, if a prim has a scale of (1, 2, 3) and it is a child of a prim with a scale of (4, 5, 6),
-    then the scale of the prim in the world frame is (4, 10, 18).
-
-    Args:
-        prim: The USD prim to resolve the scale for.
-
-    Returns:
-        The scale of the prim in the x, y, and z directions in the world frame.
-
-    Raises:
-        ValueError: If the prim is not valid.
-    """
-    # check if prim is valid
-    if not prim.IsValid():
-        raise ValueError(f"Prim at path '{prim.GetPath().pathString}' is not valid.")
-    # compute local to world transform
-    xform = UsdGeom.Xformable(prim)
-    world_transform = xform.ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-    # extract scale
-    return tuple([*(v.GetLength() for v in world_transform.ExtractRotationMatrix())])
-
-
-"""
-Attribute - Setters.
-"""
 
 
 def set_prim_visibility(prim: Usd.Prim, visible: bool) -> None:
@@ -428,19 +409,100 @@ def safe_set_attribute_on_usd_prim(prim: Usd.Prim, attr_name: str, value: Any, c
             f"Cannot set attribute '{attr_name}' with value '{value}'. Please modify the code to support this type."
         )
 
-    # early attach stage to usd context if stage is in memory
-    # since stage in memory is not supported by the "ChangePropertyCommand" kit command
-    attach_stage_to_usd_context(attaching_early=True)
-
-    # change property
-    omni.kit.commands.execute(
-        "ChangePropertyCommand",
-        prop_path=Sdf.Path(f"{prim.GetPath()}.{attr_name}"),
+    # change property using the change_prim_property function
+    change_prim_property(
+        prop_path=f"{prim.GetPath()}.{attr_name}",
         value=value,
-        prev=None,
+        stage=prim.GetStage(),
         type_to_create_if_not_exist=sdf_type,
-        usd_context_name=prim.GetStage(),
     )
+
+
+def change_prim_property(
+    prop_path: str | Sdf.Path,
+    value: Any,
+    stage: Usd.Stage | None = None,
+    type_to_create_if_not_exist: Sdf.ValueTypeNames | None = None,
+    is_custom: bool = False,
+) -> bool:
+    """Change or create a property value on a USD prim.
+
+    This is a simplified property setter that works with the current edit target. If you need
+    complex layer management, use :class:`omni.kit.commands.ChangePropertyCommand` instead.
+
+    By default, this function changes the value of the property when it exists. If the property
+    doesn't exist, :attr:`type_to_create_if_not_exist` must be provided to create it.
+
+    Note:
+        The attribute :attr:`value` must be the correct type for the property.
+        For example, if the property is a float, the value must be a float.
+        If it is supposed to be a RGB color, the value must be of type :class:`Gf.Vec3f`.
+
+    Args:
+        prop_path: Property path in the format ``/World/Prim.propertyName``.
+        value: Value to set. If None, the attribute value goes to its default value.
+            If the attribute has no default value, it is a silent no-op.
+        stage: The USD stage. Defaults to None, in which case the current stage is used.
+        type_to_create_if_not_exist: If not None and property doesn't exist, a new property will
+            be created with the given type and value. Defaults to None.
+        is_custom: If the property is created, specify if it is a custom property (not part of
+            the schema). Defaults to False.
+
+    Returns:
+        True if the property was successfully changed, False otherwise.
+
+    Raises:
+        ValueError: If the prim does not exist at the specified path.
+
+    Example:
+        >>> import isaaclab.sim as sim_utils
+        >>> from pxr import Sdf
+        >>>
+        >>> # Change an existing property
+        >>> sim_utils.change_prim_property(prop_path="/World/Cube.size", value=2.0)
+        True
+        >>>
+        >>> # Create a new custom property
+        >>> sim_utils.change_prim_property(
+        ...     prop_path="/World/Cube.customValue",
+        ...     value=42,
+        ...     type_to_create_if_not_exist=Sdf.ValueTypeNames.Int,
+        ...     is_custom=True,
+        ... )
+        True
+    """
+    # get stage handle
+    stage = get_current_stage() if stage is None else stage
+
+    # convert to Sdf.Path if needed
+    prop_path = Sdf.Path(prop_path) if isinstance(prop_path, str) else prop_path
+
+    # get the prim path
+    prim_path = prop_path.GetAbsoluteRootOrPrimPath()
+    prim = stage.GetPrimAtPath(prim_path)
+    if not prim or not prim.IsValid():
+        raise ValueError(f"Prim does not exist at path: '{prim_path}'")
+
+    # get or create the property
+    prop = stage.GetPropertyAtPath(prop_path)
+
+    if not prop:
+        if type_to_create_if_not_exist is not None:
+            # create new attribute on the prim
+            prop = prim.CreateAttribute(prop_path.name, type_to_create_if_not_exist, is_custom)
+        else:
+            logger.error(f"Property {prop_path} does not exist and 'type_to_create_if_not_exist' was not provided.")
+            return False
+
+    if not prop:
+        logger.error(f"Failed to get or create property at path: '{prop_path}'")
+        return False
+
+    # set the value
+    if value is None:
+        return bool(prop.Clear())
+    else:
+        return bool(prop.Set(value, Usd.TimeCode.Default()))
 
 
 """
@@ -744,6 +806,7 @@ def bind_visual_material(
         raise ValueError(f"Visual material '{material_path}' does not exist.")
 
     # resolve token for weaker than descendants
+    # bind material command expects a string token
     if stronger_than_descendants:
         binding_strength = "strongerThanDescendants"
     else:
@@ -897,19 +960,14 @@ def add_usd_reference(
     ret_val = get_metrics_assembler_interface().check_layers(
         stage.GetRootLayer().identifier, sdf_layer.identifier, stage_id
     )
+    # log that metric assembler did not detect any issues
     if ret_val["ret_val"]:
-        try:
-            import omni.metrics.assembler.ui
-
-            omni.kit.commands.execute(
-                "AddReference", stage=stage, prim_path=prim.GetPath(), reference=Sdf.Reference(usd_path)
-            )
-
-            return prim
-        except Exception:
-            return _add_reference_to_prim(prim)
-    else:
-        return _add_reference_to_prim(prim)
+        logger.info(
+            "Metric assembler detected no issues between the current stage and the referenced USD file at path:"
+            f" {usd_path}"
+        )
+    # add reference to the prim
+    return _add_reference_to_prim(prim)
 
 
 def get_usd_references(prim_path: str, stage: Usd.Stage | None = None) -> list[str]:
@@ -921,6 +979,9 @@ def get_usd_references(prim_path: str, stage: Usd.Stage | None = None) -> list[s
 
     Returns:
         A list of USD reference paths.
+
+    Raises:
+        ValueError: If the prim at the specified path is not valid.
     """
     # get stage handle
     stage = get_current_stage() if stage is None else stage
@@ -931,7 +992,8 @@ def get_usd_references(prim_path: str, stage: Usd.Stage | None = None) -> list[s
     # get USD references
     references = []
     for prim_spec in prim.GetPrimStack():
-        references.extend(prim_spec.referenceList.prependedItems.assetPath)
+        for ref in prim_spec.referenceList.prependedItems:
+            references.append(str(ref.assetPath))
     return references
 
 
@@ -965,6 +1027,7 @@ def select_usd_variants(prim_path: str, variants: object | dict[str, str], stage
         class TableVariants:
             color: Literal["blue", "red"] = "red"
             size: Literal["small", "large"] = "large"
+
 
         select_usd_variants(
             prim_path="/World/Table",
@@ -1008,3 +1071,59 @@ def select_usd_variants(prim_path: str, variants: object | dict[str, str], stage
                 f"Setting variant selection '{variant_selection}' for variant set '{variant_set_name}' on"
                 f" prim '{prim_path}'."
             )
+
+
+"""
+Internal Helpers.
+"""
+
+
+def _to_tuple(value: Any) -> tuple[float, ...]:
+    """Convert various sequence types to a Python tuple of floats.
+
+    This function provides robust conversion from different array-like types (list, tuple, numpy array,
+    torch tensor) to Python tuples. It handles edge cases like malformed sequences, CUDA tensors,
+    and arrays with singleton dimensions.
+
+    Args:
+        value: A sequence-like object containing floats. Supported types include:
+            - Python list or tuple
+            - NumPy array (any device)
+            - PyTorch tensor (CPU or CUDA)
+            - Mixed sequences with numpy/torch scalar items and float values
+
+    Returns:
+        A one-dimensional tuple of floats.
+
+    Raises:
+        ValueError: If the input value is not one-dimensional after squeezing singleton dimensions.
+
+    Example:
+        >>> import torch
+        >>> import numpy as np
+        >>>
+        >>> _to_tuple([1.0, 2.0, 3.0])
+        (1.0, 2.0, 3.0)
+        >>> _to_tuple(torch.tensor([[1.0, 2.0]]))  # Squeezes first dimension
+        (1.0, 2.0)
+        >>> _to_tuple(np.array([1.0, 2.0, 3.0]))
+        (1.0, 2.0, 3.0)
+        >>> _to_tuple((1.0, 2.0, 3.0))
+        (1.0, 2.0, 3.0)
+
+    """
+    # Normalize to tensor if value is a plain sequence (list with mixed types, etc.)
+    # This handles cases like [np.float32(1.0), 2.0, torch.tensor(3.0)]
+    if not hasattr(value, "tolist"):
+        value = torch.tensor(value, device="cpu", dtype=torch.float)
+
+    # Remove leading singleton dimension if present (e.g., shape (1, 3) -> (3,))
+    # This is common when batched operations produce single-item batches
+    if value.ndim != 1:
+        value = value.squeeze()
+    # Validate that the result is one-dimensional
+    if value.ndim != 1:
+        raise ValueError(f"Input value is not one dimensional: {value.shape}")
+
+    # Convert to tuple - works for both numpy arrays and torch tensors
+    return tuple(value.tolist())

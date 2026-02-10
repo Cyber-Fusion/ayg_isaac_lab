@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -298,8 +298,8 @@ class ContainerInterface:
     """
 
     def _resolve_image_extension(self, yamls: list[str] | None = None, envs: list[str] | None = None):
-        """
-        Resolve the image extension by setting up YAML files, profiles, and environment files for the Docker compose command.
+        """Resolve the image extension by setting up YAML files, profiles, and environment files for the
+        Docker compose command.
 
         Args:
             yamls: A list of yaml files to extend ``docker-compose.yaml`` settings. These are extended in the order

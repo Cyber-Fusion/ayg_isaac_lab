@@ -1,10 +1,11 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
 import hashlib
 import logging
+
 import numpy as np
 import torch
 import trimesh
@@ -12,7 +13,7 @@ from trimesh.sample import sample_surface
 
 from pxr import UsdGeom
 
-import isaaclab.sim.utils as sim_utils
+import isaaclab.sim as sim_utils
 
 # ---- module-scope caches ----
 _PRIM_SAMPLE_CACHE: dict[tuple[str, int], np.ndarray] = {}  # (prim_hash, num_points) -> (N,3) in root frame

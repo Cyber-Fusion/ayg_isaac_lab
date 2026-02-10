@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -8,10 +8,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import omni.kit.commands
 from pxr import Sdf, Usd
 
-from isaaclab.sim.utils import attach_stage_to_usd_context, clone, create_prim, get_current_stage
+from isaaclab.sim.utils import change_prim_property, clone, create_prim, get_current_stage
 from isaaclab.utils import to_camel_case
 
 if TYPE_CHECKING:
@@ -94,15 +93,10 @@ def spawn_camera(
 
     # lock camera from viewport (this disables viewport movement for camera)
     if cfg.lock_camera:
-        # early attach stage to usd context if stage is in memory
-        # since stage in memory is not supported by the "ChangePropertyCommand" kit command
-        attach_stage_to_usd_context(attaching_early=True)
-
-        omni.kit.commands.execute(
-            "ChangePropertyCommand",
-            prop_path=Sdf.Path(f"{prim_path}.omni:kit:cameraLock"),
+        change_prim_property(
+            prop_path=f"{prim_path}.omni:kit:cameraLock",
             value=True,
-            prev=None,
+            stage=stage,
             type_to_create_if_not_exist=Sdf.ValueTypeNames.Bool,
         )
     # decide the custom attributes to add

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -12,9 +12,9 @@ simulation_app = AppLauncher(headless=True).app
 
 """Rest everything follows."""
 
+import pytest
 import torch
 
-import pytest
 from isaacsim.core.cloner import GridCloner
 
 import isaaclab.sim as sim_utils
@@ -198,7 +198,25 @@ def sim():
     # Reference frame for targets
     frame = "root"
 
-    yield sim, num_envs, robot_cfg, ee_marker, goal_marker, contact_forces, target_abs_pos_set_b, target_abs_pose_set_b, target_rel_pos_set, target_rel_pose_set_b, target_abs_wrench_set, target_abs_pose_variable_kp_set, target_abs_pose_variable_set, target_hybrid_set_b, target_hybrid_variable_kp_set, target_hybrid_set_tilted, frame
+    yield (
+        sim,
+        num_envs,
+        robot_cfg,
+        ee_marker,
+        goal_marker,
+        contact_forces,
+        target_abs_pos_set_b,
+        target_abs_pose_set_b,
+        target_rel_pos_set,
+        target_rel_pose_set_b,
+        target_abs_wrench_set,
+        target_abs_pose_variable_kp_set,
+        target_abs_pose_variable_set,
+        target_hybrid_set_b,
+        target_hybrid_variable_kp_set,
+        target_hybrid_set_tilted,
+        frame,
+    )
 
     # Cleanup
     sim.stop()

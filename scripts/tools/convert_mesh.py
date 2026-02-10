@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -31,7 +31,8 @@ optional arguments:
   -h, --help                    Show this help message and exit
   --make-instanceable,          Make the asset instanceable for efficient cloning. (default: False)
   --collision-approximation     The method used for approximating collision mesh. Defaults to convexDecomposition.
-                                Set to \"none\" to not add a collision mesh to the converted mesh. (default: convexDecomposition)
+                                Set to \"none\" to not add a collision mesh to the converted mesh.
+                                (default: convexDecomposition)
   --mass                        The mass (in kg) to assign to the converted asset. (default: None)
 
 """

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -15,11 +15,12 @@ simulation_app = AppLauncher(headless=True, enable_cameras=True).app
 """Rest everything follows."""
 
 import os
+
+import flatdict
+import pytest
 import toml
 
 import carb
-import flatdict
-import pytest
 
 from isaaclab.sim.simulation_cfg import RenderCfg, SimulationCfg
 from isaaclab.sim.simulation_context import SimulationContext

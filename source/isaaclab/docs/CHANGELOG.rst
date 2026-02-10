@@ -1,6 +1,164 @@
 Changelog
 ---------
 
+0.54.3 (2026-02-04)
+~~~~~~~~~~~~~~~~~~~
+
+Fixed
+^^^^^
+
+* Fixed :class:`~isaaclab.envs.mdp.actions.JointPositionToLimitsAction` and
+  :class:`~isaaclab.envs.mdp.actions.EMAJointPositionToLimitsAction` ignoring
+  ``preserve_order=True`` when the number of specified joints matches the total
+  number of joints in the asset. The optimization that replaced joint indices with
+  ``slice(None)`` now correctly checks for the ``preserve_order`` flag.
+
+
+0.54.2 (2026-01-28)
+~~~~~~~~~~~~~~~~~~~
+
+Changed
+^^^^^^^
+
+* Moved :mod:`isaaclab.sensors.tacsl_sensor` to :mod:`isaaclab_contrib.sensors.tacsl_sensor` module,
+  since it is not completely ready for release yet.
+
+
+0.54.1 (2026-01-25)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added test suite for ray caster patterns with comprehensive parameterized tests.
+
+Fixed
+^^^^^
+
+* Fixed incorrect horizontal angle calculation in :func:`~isaaclab.sensors.ray_caster.patterns.patterns.lidar_pattern`
+  that caused the actual angular resolution to differ from the requested resolution.
+
+
+0.54.0 (2026-01-13)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added Fabric backend support to :class:`~isaaclab.sim.views.XformPrimView` for GPU-accelerated
+  batch transform operations on all Boundable prims using Warp kernels.
+* Added :mod:`~isaaclab.sim.utils.fabric_utils` module with Warp kernels for efficient Fabric matrix operations.
+
+Changed
+^^^^^^^
+
+* Changed :class:`~isaaclab.sensors.camera.Camera` to use Fabric backend for faster pose queries.
+
+
+0.53.2 (2026-01-14)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added :class:`~isaaclab.assets.utils.wrench_composer.WrenchComposer` to compose forces and torques at the body's center of mass frame.
+* Added :meth:`~isaaclab.assets.Articulation.instantaneous_wrench_composer` to add or set instantaneous external wrenches to the articulation.
+* Added :meth:`~isaaclab.assets.Articulation.permanent_wrench_composer` to add or set permanent external wrenches to the articulation.
+* Added :meth:`~isaaclab.assets.RigidObject.instantaneous_wrench_composer` to add or set instantaneous external wrenches to the rigid object.
+* Added :meth:`~isaaclab.assets.RigidObject.permanent_wrench_composer` to add or set permanent external wrenches to the rigid object.
+* Added :meth:`~isaaclab.assets.RigidObjectCollection.instantaneous_wrench_composer` to add or set instantaneous external wrenches to the rigid object collection.
+* Added :meth:`~isaaclab.assets.RigidObjectCollection.permanent_wrench_composer` to add or set permanent external wrenches to the rigid object collection.
+* Added unit tests for the wrench composer.
+* Added kernels for the wrench composer in the :mod:`isaaclab.utils.warp.kernels` module.
+
+Changed
+^^^^^^^
+
+* Deprecated :meth:`~isaaclab.assets.Articulation.set_external_force_and_torque`  in favor of :meth:`~isaaclab.assets.Articulation.permanent_wrench_composer.set_forces_and_torques`.
+* Deprecated :meth:`~isaaclab.assets.RigidObject.set_external_force_and_torque`  in favor of :meth:`~isaaclab.assets.RigidObject.permanent_wrench_composer.set_forces_and_torques`.
+* Deprecated :meth:`~isaaclab.assets.RigidObjectCollection.set_external_force_and_torque`  in favor of :meth:`~isaaclab.assets.RigidObjectCollection.permanent_wrench_composer.set_forces_and_torques`.
+* Modified the tests of the articulation, rigid object, and rigid object collection to use the new permanent and instantaneous external wrench functions and test them.
+
+0.53.1 (2026-01-08)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added function :func:`~isaaclab.sim.utils.prims.change_prim_property` to change attributes on a USD prim.
+  This replaces the previously used USD command ``ChangeProperty`` that depends on Omniverse Kit API.
+
+Changed
+^^^^^^^
+
+* Replaced occurrences of ``ChangeProperty`` USD command to :func:`~isaaclab.sim.utils.prims.change_prim_property`.
+
+
+0.53.0 (2026-01-07)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added :class:`~isaaclab.sim.views.XformPrimView` class to provide a
+  view of the USD Xform operations. Compared to Isaac Sim implementation,
+  this class optimizes several operations using USD SDF API.
+
+Changed
+^^^^^^^
+
+* Switched the sensor classes to use the :class:`~isaaclab.sim.views.XformPrimView`
+  class for the internal view wherever applicable.
+
+Removed
+^^^^^^^
+
+* Removed the usage of :class:`isaacsim.core.utils.prims.XformPrim`
+  class from the sensor classes.
+
+
+0.52.2 (2026-01-06)
+~~~~~~~~~~~~~~~~~~~
+
+Fixed
+^^^^^
+
+* Improved logic for the URDF importer extension version pinning: the older extension version
+  is now pinned only on Isaac Sim 5.1 and later, while older Isaac Sim versions no longer
+  attempt to pin to a version that does not exist.
+
+
+0.52.1 (2026-01-02)
+~~~~~~~~~~~~~~~~~~~
+
+Fixed
+^^^^^
+
+* Fixed FrameTransformer body name collision when tracking bodies with the same name but different hierarchical paths
+  (e.g., Robot/left_hand vs Robot_1/left_hand). The sensor now uses the full prim path (with env_* patterns normalized)
+  as the unique body identifier instead of just the leaf body name. This ensures bodies at different hierarchy levels
+  are tracked separately. The change is backwards compatible: user-facing frame names still default to leaf names when
+  not explicitly provided, while internal body tracking uses full paths to avoid collisions. Works for both
+  environment-scoped paths (e.g., /World/envs/env_0/Robot) and non-environment paths (e.g., /World/Robot).
+
+
+0.52.0 (2026-01-02)
+~~~~~~~~~~~~~~~~~~~
+
+Added
+^^^^^
+
+* Added :mod:`~isaaclab.sim.utils.transforms` module to handle USD Xform operations.
+* Added passing of ``stage`` to the :func:`~isaaclab.sim.utils.prims.create_prim` function
+  inside spawning functions to allow for the creation of prims in a specific stage.
+
+Changed
+^^^^^^^
+
+* Changed :func:`~isaaclab.sim.utils.prims.create_prim` function to use the :mod:`~isaaclab.sim.utils.transforms`
+  module for USD Xform operations. It removes the usage of Isaac Sim's XformPrim class.
+
+
 0.51.2 (2025-12-30)
 ~~~~~~~~~~~~~~~~~~~
 

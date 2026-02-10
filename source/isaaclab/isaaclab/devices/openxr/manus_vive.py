@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -10,9 +10,10 @@ Manus and Vive for teleoperation and interaction.
 from __future__ import annotations
 
 import contextlib
-import numpy as np
 from collections.abc import Callable
 from dataclasses import dataclass
+
+import numpy as np
 from packaging import version
 
 import carb
@@ -203,15 +204,17 @@ class ManusVive(DeviceBase):
             quatw = quat.GetReal()
 
             # Store in w, x, y, z order to match our convention
-            self._previous_headpose = np.array([
-                position[0],
-                position[1],
-                position[2],
-                quatw,
-                quati[0],
-                quati[1],
-                quati[2],
-            ])
+            self._previous_headpose = np.array(
+                [
+                    position[0],
+                    position[1],
+                    position[2],
+                    quatw,
+                    quati[0],
+                    quati[1],
+                    quati[2],
+                ]
+            )
 
         return self._previous_headpose
 

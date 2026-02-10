@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -7,21 +7,21 @@ from __future__ import annotations
 
 import json
 import logging
-import numpy as np
 import re
-import torch
 from collections.abc import Sequence
-from packaging import version
 from typing import TYPE_CHECKING, Any, Literal
 
+import numpy as np
+import torch
+from packaging import version
+
 import carb
-import omni.kit.commands
 import omni.usd
-from isaacsim.core.prims import XFormPrim
 from pxr import Sdf, UsdGeom
 
 import isaaclab.sim as sim_utils
 import isaaclab.utils.sensors as sensor_utils
+from isaaclab.sim.views import XformPrimView
 from isaaclab.utils import to_camel_case
 from isaaclab.utils.array import convert_to_torch
 from isaaclab.utils.math import (
@@ -258,7 +258,6 @@ class Camera(SensorBase):
             matrices = np.asarray(matrices, dtype=float)
         # iterate over env_ids
         for i, intrinsic_matrix in zip(env_ids, matrices):
-
             height, width = self.image_shape
 
             params = sensor_utils.convert_camera_intrinsics_to_usd(
@@ -404,9 +403,10 @@ class Camera(SensorBase):
 
         # Initialize parent class
         super()._initialize_impl()
-        # Create a view for the sensor
-        self._view = XFormPrim(self.cfg.prim_path, reset_xform_properties=False)
-        self._view.initialize()
+        # Create a view for the sensor with Fabric enabled for fast pose queries, otherwise position will be stale.
+        self._view = XformPrimView(
+            self.cfg.prim_path, device=self._device, stage=self.stage, sync_usd_on_fabric_write=True
+        )
         # Check that sizes are correct
         if self._view.count != self._num_envs:
             raise RuntimeError(
@@ -424,9 +424,9 @@ class Camera(SensorBase):
         self._rep_registry: dict[str, list[rep.annotators.Annotator]] = {name: list() for name in self.cfg.data_types}
 
         # Convert all encapsulated prims to Camera
-        for cam_prim_path in self._view.prim_paths:
-            # Get camera prim
-            cam_prim = self.stage.GetPrimAtPath(cam_prim_path)
+        for cam_prim in self._view.prims:
+            # Obtain the prim path
+            cam_prim_path = cam_prim.GetPath().pathString
             # Check if prim is a camera
             if not cam_prim.IsA(UsdGeom.Camera):
                 raise RuntimeError(f"Prim at path '{cam_prim_path}' is not a Camera.")

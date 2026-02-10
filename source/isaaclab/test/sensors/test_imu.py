@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -14,9 +14,9 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import pathlib
-import torch
 
 import pytest
+import torch
 
 import isaaclab.sim as sim_utils
 import isaaclab.utils.math as math_utils
@@ -360,7 +360,6 @@ def test_single_dof_pendulum(setup_sim):
 
     # should achieve same results between the two imu sensors on the robot
     for idx in range(500):
-
         # write data to sim
         scene.write_data_to_sim()
         # perform step
@@ -494,7 +493,6 @@ def test_indirect_attachment(setup_sim):
 
     # should achieve same results between the two imu sensors on the robot
     for idx in range(500):
-
         # write data to sim
         scene.write_data_to_sim()
         # perform step

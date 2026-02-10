@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -20,11 +20,11 @@ The marker prototypes can be configured with the :class:`VisualizationMarkersCfg
 from __future__ import annotations
 
 import logging
-import numpy as np
-import torch
 from dataclasses import MISSING
 
-import omni.kit.commands
+import numpy as np
+import torch
+
 import omni.physx.scripts.utils as physx_utils
 from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, Vt
 
@@ -100,7 +100,7 @@ class VisualizationMarkers:
                         radius=1.0,
                         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
                     ),
-                }
+                },
             )
             # Create the markers instance
             # This will create a UsdGeom.PointInstancer prim at the given path along with the marker prototypes.
@@ -396,16 +396,11 @@ class VisualizationMarkers:
                 child_prim.SetInstanceable(False)
             # check if prim is a mesh -> if so, make it invisible to secondary rays
             if child_prim.IsA(UsdGeom.Gprim):
-                # early attach stage to usd context if stage is in memory
-                # since stage in memory is not supported by the "ChangePropertyCommand" kit command
-                sim_utils.attach_stage_to_usd_context(attaching_early=True)
-
                 # invisible to secondary rays such as depth images
-                omni.kit.commands.execute(
-                    "ChangePropertyCommand",
-                    prop_path=Sdf.Path(f"{child_prim.GetPrimPath().pathString}.primvars:invisibleToSecondaryRays"),
+                sim_utils.change_prim_property(
+                    prop_path=f"{child_prim.GetPrimPath().pathString}.primvars:invisibleToSecondaryRays",
                     value=True,
-                    prev=None,
+                    stage=prim.GetStage(),
                     type_to_create_if_not_exist=Sdf.ValueTypeNames.Bool,
                 )
             # add children to list

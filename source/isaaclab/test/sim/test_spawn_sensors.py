@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -14,10 +14,11 @@ simulation_app = AppLauncher(headless=True).app
 
 
 import pytest
-from isaacsim.core.api.simulation_context import SimulationContext
+
 from pxr import Usd
 
 import isaaclab.sim as sim_utils
+from isaaclab.sim import SimulationCfg, SimulationContext
 from isaaclab.sim.spawners.sensors.sensors import CUSTOM_FISHEYE_CAMERA_ATTRIBUTES, CUSTOM_PINHOLE_CAMERA_ATTRIBUTES
 from isaaclab.utils.string import to_camel_case
 
@@ -27,7 +28,7 @@ def sim():
     """Create a simulation context."""
     sim_utils.create_new_stage()
     dt = 0.1
-    sim = SimulationContext(physics_dt=dt, rendering_dt=dt, backend="numpy")
+    sim = SimulationContext(SimulationCfg(dt=dt))
     sim_utils.update_stage()
     yield sim
     sim.stop()
