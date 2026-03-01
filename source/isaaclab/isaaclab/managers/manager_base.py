@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -7,22 +7,25 @@ from __future__ import annotations
 
 import copy
 import inspect
+import logging
 import weakref
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-import omni.log
 import omni.timeline
 
 import isaaclab.utils.string as string_utils
-from isaaclab.utils import string_to_callable
+from isaaclab.utils import class_to_dict, string_to_callable
 
 from .manager_term_cfg import ManagerTermBaseCfg
 from .scene_entity_cfg import SceneEntityCfg
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
+
+# import logger
+logger = logging.getLogger(__name__)
 
 
 class ManagerTermBase(ABC):
@@ -42,12 +45,13 @@ class ManagerTermBase(ABC):
         from isaaclab.utils import configclass
         from isaaclab.utils.mdp import ManagerBase, ManagerTermBaseCfg
 
+
         @configclass
         class MyManagerCfg:
-
             my_term_1: ManagerTermBaseCfg = ManagerTermBaseCfg(...)
             my_term_2: ManagerTermBaseCfg = ManagerTermBaseCfg(...)
             my_term_3: ManagerTermBaseCfg = ManagerTermBaseCfg(...)
+
 
         # define manager instance
         my_manager = ManagerBase(cfg=ManagerCfg(), env=env)
@@ -79,6 +83,11 @@ class ManagerTermBase(ABC):
         """Device on which to perform computations."""
         return self._env.device
 
+    @property
+    def __name__(self) -> str:
+        """Return the name of the class or subclass."""
+        return self.__class__.__name__
+
     """
     Operations.
     """
@@ -91,6 +100,10 @@ class ManagerTermBase(ABC):
                 all environments are considered.
         """
         pass
+
+    def serialize(self) -> dict:
+        """General serialization call. Includes the configuration dict."""
+        return {"cfg": class_to_dict(self.cfg)}
 
     def __call__(self, *args) -> Any:
         """Returns the value of the term required by the manager.
@@ -135,6 +148,10 @@ class ManagerBase(ABC):
         # store the inputs
         self.cfg = copy.deepcopy(cfg)
         self._env = env
+
+        # flag for whether the scene entities have been resolved
+        # if sim is playing, we resolve the scene entities directly while preparing the terms
+        self._is_scene_entities_resolved = self._env.sim.is_playing()
 
         # if the simulation is not playing, we use callbacks to trigger the resolution of the scene
         # entities configuration. this is needed for cases where the manager is created after the
@@ -256,6 +273,9 @@ class ManagerBase(ABC):
 
         Please check the :meth:`_process_term_cfg_at_play` method for more information.
         """
+        # check if scene entities have been resolved
+        if self._is_scene_entities_resolved:
+            return
         # check if config is dict already
         if isinstance(self.cfg, dict):
             cfg_items = self.cfg.items()
@@ -270,6 +290,9 @@ class ManagerBase(ABC):
             # process attributes at runtime
             # these properties are only resolvable once the simulation starts playing
             self._process_term_cfg_at_play(term_name, term_cfg)
+
+        # set the flag
+        self._is_scene_entities_resolved = True
 
     """
     Internal functions.
@@ -385,11 +408,11 @@ class ManagerBase(ABC):
                 if value.body_ids is not None:
                     msg += f"\n\tBody names: {value.body_names} [{value.body_ids}]"
                 # print the information
-                omni.log.info(msg)
+                logger.info(msg)
             # store the entity
             term_cfg.params[key] = value
 
         # initialize the term if it is a class
         if inspect.isclass(term_cfg.func):
-            omni.log.info(f"Initializing term '{term_name}' with class '{term_cfg.func.__name__}'.")
+            logger.info(f"Initializing term '{term_name}' with class '{term_cfg.func.__name__}'.")
             term_cfg.func = term_cfg.func(cfg=term_cfg, env=self._env)

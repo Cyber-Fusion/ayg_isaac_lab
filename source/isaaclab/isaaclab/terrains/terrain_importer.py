@@ -1,26 +1,28 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING
+
 import numpy as np
 import torch
 import trimesh
-from typing import TYPE_CHECKING
-
-import omni.log
 
 import isaaclab.sim as sim_utils
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.markers.config import FRAME_MARKER_CFG
 
-from .terrain_generator import TerrainGenerator
 from .utils import create_prim_from_mesh
 
 if TYPE_CHECKING:
     from .terrain_importer_cfg import TerrainImporterCfg
+
+# import logger
+logger = logging.getLogger(__name__)
 
 
 class TerrainImporter:
@@ -84,10 +86,15 @@ class TerrainImporter:
             if self.cfg.terrain_generator is None:
                 raise ValueError("Input terrain type is 'generator' but no value provided for 'terrain_generator'.")
             # generate the terrain
-            terrain_generator = TerrainGenerator(cfg=self.cfg.terrain_generator, device=self.device)
+            terrain_generator = self.cfg.terrain_generator.class_type(
+                cfg=self.cfg.terrain_generator, device=self.device
+            )
             self.import_mesh("terrain", terrain_generator.terrain_mesh)
-            # configure the terrain origins based on the terrain generator
-            self.configure_env_origins(terrain_generator.terrain_origins)
+            if self.cfg.use_terrain_origins:
+                # configure the terrain origins based on the terrain generator
+                self.configure_env_origins(terrain_generator.terrain_origins)
+            else:
+                self.configure_env_origins()
             # refer to the flat patches
             self._terrain_flat_patches = terrain_generator.flat_patches
         elif self.cfg.terrain_type == "usd":
@@ -207,7 +214,7 @@ class TerrainImporter:
             if "diffuse_color" in material:
                 color = material["diffuse_color"]
             else:
-                omni.log.warn(
+                logger.warning(
                     "Visual material specified for ground plane but no diffuse color found."
                     " Using default color: (0.0, 0.0, 0.0)"
                 )
@@ -372,7 +379,7 @@ class TerrainImporter:
         .. deprecated:: v2.1.0
             The `warp_meshes` attribute is deprecated. It is no longer stored inside the class.
         """
-        omni.log.warn(
+        logger.warning(
             "The `warp_meshes` attribute is deprecated. It is no longer stored inside the `TerrainImporter` class."
             " Returning an empty dictionary."
         )
@@ -385,7 +392,7 @@ class TerrainImporter:
         .. deprecated:: v2.1.0
             The `meshes` attribute is deprecated. It is no longer stored inside the class.
         """
-        omni.log.warn(
+        logger.warning(
             "The `meshes` attribute is deprecated. It is no longer stored inside the `TerrainImporter` class."
             " Returning an empty dictionary."
         )

@@ -1,10 +1,11 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-import torch
 from collections.abc import Sequence
+
+import torch
 
 
 class CircularBuffer:
@@ -78,8 +79,11 @@ class CircularBuffer:
     @property
     def buffer(self) -> torch.Tensor:
         """Complete circular buffer with most recent entry at the end and oldest entry at the beginning.
-        Returns:
-            Complete circular buffer with most recent entry at the end and oldest entry at the beginning of dimension 1. The shape is [batch_size, max_length, data.shape[1:]].
+
+        The shape of the buffer is (batch_size, max_length, ...).
+
+        Note:
+            The oldest entry is at the beginning of dimension 1.
         """
         buf = self._buffer.clone()
         buf = torch.roll(buf, shifts=self.max_length - self._pointer - 1, dims=0)
@@ -101,7 +105,8 @@ class CircularBuffer:
         # reset the number of pushes for the specified batch indices
         self._num_pushes[batch_ids] = 0
         if self._buffer is not None:
-            # set buffer at batch_id reset indices to 0.0 so that the buffer() getter returns the cleared circular buffer after reset.
+            # set buffer at batch_id reset indices to 0.0 so that the buffer()
+            # getter returns the cleared circular buffer after reset.
             self._buffer[:, batch_ids, :] = 0.0
 
     def append(self, data: torch.Tensor):
@@ -116,8 +121,10 @@ class CircularBuffer:
         """
         # check the batch size
         if data.shape[0] != self.batch_size:
-            raise ValueError(f"The input data has {data.shape[0]} environments while expecting {self.batch_size}")
+            raise ValueError(f"The input data has '{data.shape[0]}' batch size while expecting '{self.batch_size}'")
 
+        # move the data to the device
+        data = data.to(self._device)
         # at the first call, initialize the buffer size
         if self._buffer is None:
             self._pointer = -1
@@ -125,12 +132,11 @@ class CircularBuffer:
         # move the head to the next slot
         self._pointer = (self._pointer + 1) % self.max_length
         # add the new data to the last layer
-        self._buffer[self._pointer] = data.to(self._device)
+        self._buffer[self._pointer] = data
         # Check for batches with zero pushes and initialize all values in batch to first append
-        if 0 in self._num_pushes.tolist():
-            fill_ids = [i for i, x in enumerate(self._num_pushes.tolist()) if x == 0]
-            self._num_pushes.tolist().index(0) if 0 in self._num_pushes.tolist() else None
-            self._buffer[:, fill_ids, :] = data.to(self._device)[fill_ids]
+        is_first_push = self._num_pushes == 0
+        if torch.any(is_first_push):
+            self._buffer[:, is_first_push] = data[is_first_push]
         # increment number of number of pushes for all batches
         self._num_pushes += 1
 

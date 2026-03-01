@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -6,10 +6,9 @@
 from __future__ import annotations
 
 import math
-import torch
 from collections.abc import Sequence
 
-from isaaclab_assets.robots.cart_double_pendulum import CART_DOUBLE_PENDULUM_CFG
+import torch
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, ArticulationCfg
@@ -19,6 +18,8 @@ from isaaclab.sim import SimulationCfg
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils import configclass
 from isaaclab.utils.math import sample_uniform
+
+from isaaclab_assets.robots.cart_double_pendulum import CART_DOUBLE_PENDULUM_CFG
 
 
 @configclass
@@ -82,6 +83,9 @@ class CartDoublePendulumEnv(DirectMARLEnv):
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
         # clone and replicate
         self.scene.clone_environments(copy_from_source=False)
+        # we need to explicitly filter collisions for CPU simulation
+        if self.device == "cpu":
+            self.scene.filter_collisions(global_prim_paths=[])
         # add articulation to scene
         self.scene.articulations["robot"] = self.robot
         # add lights

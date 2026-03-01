@@ -20,11 +20,11 @@ from isaaclab.assets.articulation import ArticulationCfg
 
 AYG_MOTOR_SIMPLE_ACTUATOR_CFG = DCMotorCfg(
     joint_names_expr=[".*HAA", ".*HFE", ".*KFE"],
-    effort_limit=60.0,
-    saturation_effort=40.0,
-    velocity_limit=20.0,
+    saturation_effort=60.0,
+    effort_limit=30.0,
+    velocity_limit=10.0,
     stiffness=40.0,
-    damping=1.0,
+    damping=0.5,
     friction=0.0,
 )
 """Configuration for AYG's motor with DC actuator model."""
@@ -35,9 +35,11 @@ AYG_MOTOR_SIMPLE_ACTUATOR_CFG = DCMotorCfg(
 ##
 
 AYG_CFG = ArticulationCfg(
-    spawn=sim_utils.UsdFileCfg(
-        # usd_path=f"{ISAACLAB_NUCLEUS_DIR}/Robots/Ayg/ayg/ayg.usd",
-        usd_path="/workspace/isaaclab/source/isaaclab_assets/data/Robots/ayg/ayg.usd",
+    spawn=sim_utils.UrdfFileCfg(
+        fix_base=False,
+        merge_fixed_joints=False,
+        replace_cylinders_with_capsules=False,
+        asset_path="/workspace/isaaclab/source/isaaclab_assets/data/Robots/ayg_description/urdf/ayg.urdf",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -49,12 +51,14 @@ AYG_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
-        # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.02, rest_offset=0.0),
+        joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
+            gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0)
+        ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.35),
+        pos=(0.0, 0.0, 0.36),
         joint_pos={
             ".*HAA": 0.0,       # all HAA
             ".*HFE": 0.0,       # all HFE

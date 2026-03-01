@@ -1,28 +1,40 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 
+import logging
 import re
-import torch
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-import omni.log
-import omni.physics.tensors.impl.api as physx
+import torch
+
+from isaacsim.core.simulation_manager import SimulationManager
 from pxr import UsdPhysics
 
 import isaaclab.sim as sim_utils
+import isaaclab.utils.string as string_utils
 from isaaclab.markers import VisualizationMarkers
-from isaaclab.utils.math import combine_frame_transforms, convert_quat, is_identity_pose, subtract_frame_transforms
+from isaaclab.utils.math import (
+    combine_frame_transforms,
+    convert_quat,
+    is_identity_pose,
+    normalize,
+    quat_from_angle_axis,
+    subtract_frame_transforms,
+)
 
 from ..sensor_base import SensorBase
 from .frame_transformer_data import FrameTransformerData
 
 if TYPE_CHECKING:
     from .frame_transformer_cfg import FrameTransformerCfg
+
+# import logger
+logger = logging.getLogger(__name__)
 
 
 class FrameTransformer(SensorBase):
@@ -83,6 +95,26 @@ class FrameTransformer(SensorBase):
         # return the data
         return self._data
 
+    @property
+    def num_bodies(self) -> int:
+        """Returns the number of target bodies being tracked.
+
+        Note:
+            This is an alias used for consistency with other sensors. Otherwise, we recommend using
+            :attr:`len(data.target_frame_names)` to access the number of target frames.
+        """
+        return len(self._target_frame_body_names)
+
+    @property
+    def body_names(self) -> list[str]:
+        """Returns the names of the target bodies being tracked.
+
+        Note:
+            This is an alias used for consistency with other sensors. Otherwise, we recommend using
+            :attr:`data.target_frame_names` to access the target frame names.
+        """
+        return self._target_frame_body_names
+
     """
     Operations
     """
@@ -93,6 +125,18 @@ class FrameTransformer(SensorBase):
         # resolve None
         if env_ids is None:
             env_ids = ...
+
+    def find_bodies(self, name_keys: str | Sequence[str], preserve_order: bool = False) -> tuple[list[int], list[str]]:
+        """Find bodies in the articulation based on the name keys.
+
+        Args:
+            name_keys: A regular expression or a list of regular expressions to match the body names.
+            preserve_order: Whether to preserve the order of the name keys in the output. Defaults to False.
+
+        Returns:
+            A tuple of lists containing the body indices and names.
+        """
+        return string_utils.resolve_matching_names(name_keys, self._target_frame_names, preserve_order)
 
     """
     Implementation.
@@ -109,16 +153,17 @@ class FrameTransformer(SensorBase):
         self._apply_source_frame_offset = True
         # Handle source frame offsets
         if is_identity_pose(source_frame_offset_pos, source_frame_offset_quat):
-            omni.log.verbose(f"No offset application needed for source frame as it is identity: {self.cfg.prim_path}")
+            logger.debug(f"No offset application needed for source frame as it is identity: {self.cfg.prim_path}")
             self._apply_source_frame_offset = False
         else:
-            omni.log.verbose(f"Applying offset to source frame as it is not identity: {self.cfg.prim_path}")
+            logger.debug(f"Applying offset to source frame as it is not identity: {self.cfg.prim_path}")
             # Store offsets as tensors (duplicating each env's offsets for ease of multiplication later)
             self._source_frame_offset_pos = source_frame_offset_pos.unsqueeze(0).repeat(self._num_envs, 1)
             self._source_frame_offset_quat = source_frame_offset_quat.unsqueeze(0).repeat(self._num_envs, 1)
 
-        # Keep track of mapping from the rigid body name to the desired frames and prim path, as there may be multiple frames
-        # based upon the same body name and we don't want to create unnecessary views
+        # Keep track of mapping from the rigid body name to the desired frames and prim path,
+        # as there may be multiple frames based upon the same body name and we don't want to
+        # create unnecessary views.
         body_names_to_frames: dict[str, dict[str, set[str] | str]] = {}
         # The offsets associated with each target frame
         target_offsets: dict[str, dict[str, torch.Tensor]] = {}
@@ -158,10 +203,10 @@ class FrameTransformer(SensorBase):
                         " rigid body. The class only supports transformations between rigid bodies."
                     )
 
-                # Get the name of the body
-                body_name = matching_prim_path.rsplit("/", 1)[-1]
-                # Use body name if frame isn't specified by user
-                frame_name = frame if frame is not None else body_name
+                # Get the name of the body: use relative prim path for unique identification
+                body_name = self._get_relative_body_path(matching_prim_path)
+                # Use leaf name of prim path if frame name isn't specified by user
+                frame_name = frame if frame is not None else matching_prim_path.rsplit("/", 1)[-1]
 
                 # Keep track of which frames are associated with which bodies
                 if body_name in body_names_to_frames:
@@ -189,12 +234,12 @@ class FrameTransformer(SensorBase):
                     target_offsets[frame_name] = {"pos": offset_pos, "quat": offset_quat}
 
         if not self._apply_target_frame_offset:
-            omni.log.info(
+            logger.info(
                 f"No offsets application needed from '{self.cfg.prim_path}' to target frames as all"
                 f" are identity: {frames[1:]}"
             )
         else:
-            omni.log.info(
+            logger.info(
                 f"Offsets application needed from '{self.cfg.prim_path}' to the following target frames:"
                 f" {non_identity_offset_frames}"
             )
@@ -205,9 +250,8 @@ class FrameTransformer(SensorBase):
 
         body_names_regex = [tracked_prim_path.replace("env_0", "env_*") for tracked_prim_path in tracked_prim_paths]
 
-        # Create simulation view
-        self._physics_sim_view = physx.create_simulation_view(self._backend)
-        self._physics_sim_view.set_subspace_roots("/")
+        # obtain global simulation view
+        self._physics_sim_view = SimulationManager.get_physics_sim_view()
         # Create a prim view for all frames and initialize it
         # order of transforms coming out of view will be source frame followed by target frame(s)
         self._frame_physx_view = self._physics_sim_view.create_rigid_body_view(body_names_regex)
@@ -230,8 +274,9 @@ class FrameTransformer(SensorBase):
                 match = re.search(r"env_(\d+)(.*)", item)
                 return (int(match.group(1)), match.group(2))
 
-            # Find the indices that would reorganize output to be per environment. We want `env_1/blah` to come before `env_11/blah`
-            # and env_1/Robot/base to come before env_1/Robot/foot so we need to use custom key function
+            # Find the indices that would reorganize output to be per environment.
+            # We want `env_1/blah` to come before `env_11/blah` and env_1/Robot/base
+            # to come before env_1/Robot/foot so we need to use custom key function
             self._per_env_indices = [
                 index
                 for index, _ in sorted(
@@ -245,15 +290,16 @@ class FrameTransformer(SensorBase):
             ]
 
         else:
-            # If no environment is present, then the order of the body names is the same as the order of the prim paths sorted alphabetically
+            # If no environment is present, then the order of the body names is the same as the order of the
+            # prim paths sorted alphabetically
             self._per_env_indices = [index for index, _ in sorted(enumerate(all_prim_paths), key=lambda x: x[1])]
             sorted_prim_paths = [all_prim_paths[index] for index in self._per_env_indices]
 
-        # -- target frames
-        self._target_frame_body_names = [prim_path.split("/")[-1] for prim_path in sorted_prim_paths]
+        # -- target frames: use relative prim path for unique identification
+        self._target_frame_body_names = [self._get_relative_body_path(prim_path) for prim_path in sorted_prim_paths]
 
-        # -- source frame
-        self._source_frame_body_name = self.cfg.prim_path.split("/")[-1]
+        # -- source frame: use relative prim path for unique identification
+        self._source_frame_body_name = self._get_relative_body_path(self.cfg.prim_path)
         source_frame_index = self._target_frame_body_names.index(self._source_frame_body_name)
 
         # Only remove source frame from tracked bodies if it is not also a target frame
@@ -264,7 +310,8 @@ class FrameTransformer(SensorBase):
         all_ids = torch.arange(self._num_envs * len(tracked_body_names))
         self._source_frame_body_ids = torch.arange(self._num_envs) * len(tracked_body_names) + source_frame_index
 
-        # If source frame is also a target frame, then the target frame body ids are the same as the source frame body ids
+        # If source frame is also a target frame, then the target frame body ids are the same as
+        # the source frame body ids
         if self._source_is_also_target_frame:
             self._target_frame_body_ids = all_ids
         else:
@@ -390,6 +437,7 @@ class FrameTransformer(SensorBase):
         if debug_vis:
             if not hasattr(self, "frame_visualizer"):
                 self.frame_visualizer = VisualizationMarkers(self.cfg.visualizer_cfg)
+
             # set their visibility to true
             self.frame_visualizer.set_visibility(True)
         else:
@@ -397,9 +445,33 @@ class FrameTransformer(SensorBase):
                 self.frame_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
-        # Update the visualized markers
-        if self.frame_visualizer is not None:
-            self.frame_visualizer.visualize(self._data.target_pos_w.view(-1, 3), self._data.target_quat_w.view(-1, 4))
+        # Get the all frames pose
+        frames_pos = torch.cat([self._data.source_pos_w, self._data.target_pos_w.view(-1, 3)], dim=0)
+        frames_quat = torch.cat([self._data.source_quat_w, self._data.target_quat_w.view(-1, 4)], dim=0)
+
+        # Get the all connecting lines between frames pose
+        lines_pos, lines_quat, lines_length = self._get_connecting_lines(
+            start_pos=self._data.source_pos_w.repeat_interleave(self._data.target_pos_w.size(1), dim=0),
+            end_pos=self._data.target_pos_w.view(-1, 3),
+        )
+
+        # Initialize default (identity) scales and marker indices for all markers (frames + lines)
+        marker_scales = torch.ones(frames_pos.size(0) + lines_pos.size(0), 3)
+        marker_indices = torch.zeros(marker_scales.size(0))
+
+        # Set the z-scale of line markers to represent their actual length
+        marker_scales[-lines_length.size(0) :, -1] = lines_length
+
+        # Assign marker config index 1 to line markers
+        marker_indices[-lines_length.size(0) :] = 1
+
+        # Update the frame and the connecting line visualizer
+        self.frame_visualizer.visualize(
+            translations=torch.cat((frames_pos, lines_pos), dim=0),
+            orientations=torch.cat((frames_quat, lines_quat), dim=0),
+            scales=marker_scales,
+            marker_indices=marker_indices,
+        )
 
     """
     Internal simulation callbacks.
@@ -410,5 +482,79 @@ class FrameTransformer(SensorBase):
         # call parent
         super()._invalidate_initialize_callback(event)
         # set all existing views to None to invalidate them
-        self._physics_sim_view = None
         self._frame_physx_view = None
+
+    """
+    Internal helpers.
+    """
+
+    def _get_connecting_lines(
+        self, start_pos: torch.Tensor, end_pos: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Draws connecting lines between frames.
+
+        Given start and end points, this function computes the positions (mid-point), orientations,
+        and lengths of the connecting lines.
+
+        Args:
+            start_pos: The start positions of the connecting lines. Shape is (N, 3).
+            end_pos: The end positions of the connecting lines. Shape is (N, 3).
+
+        Returns:
+            A tuple containing:
+            - The positions of each connecting line. Shape is (N, 3).
+            - The orientations of each connecting line in quaternion. Shape is (N, 4).
+            - The lengths of each connecting line. Shape is (N,).
+        """
+        direction = end_pos - start_pos
+        lengths = torch.norm(direction, dim=-1)
+        positions = (start_pos + end_pos) / 2
+
+        # Get default direction (along z-axis)
+        default_direction = torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(start_pos.size(0), -1)
+
+        # Normalize direction vector
+        direction_norm = normalize(direction)
+
+        # Calculate rotation from default direction to target direction
+        rotation_axis = torch.linalg.cross(default_direction, direction_norm)
+        rotation_axis_norm = torch.norm(rotation_axis, dim=-1)
+
+        # Handle case where vectors are parallel
+        mask = rotation_axis_norm > 1e-6
+        rotation_axis = torch.where(
+            mask.unsqueeze(-1),
+            normalize(rotation_axis),
+            torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(start_pos.size(0), -1),
+        )
+
+        # Calculate rotation angle
+        cos_angle = torch.sum(default_direction * direction_norm, dim=-1)
+        cos_angle = torch.clamp(cos_angle, -1.0, 1.0)
+        angle = torch.acos(cos_angle)
+        orientations = quat_from_angle_axis(angle, rotation_axis)
+
+        return positions, orientations, lengths
+
+    @staticmethod
+    def _get_relative_body_path(prim_path: str) -> str:
+        """Extract a normalized body path from a prim path.
+
+        Removes the environment instance segment `/envs/env_<id>/` to normalize paths
+        across multiple environments, while preserving the `/envs/` prefix to
+        distinguish environment-scoped paths from non-environment paths.
+
+        Examples:
+        - '/World/envs/env_0/Robot/torso' -> '/World/envs/Robot/torso'
+        - '/World/envs/env_123/Robot/left_hand' -> '/World/envs/Robot/left_hand'
+        - '/World/Robot' -> '/World/Robot'
+        - '/World/Robot_2/left_hand' -> '/World/Robot_2/left_hand'
+
+        Args:
+            prim_path: The full prim path.
+
+        Returns:
+            The prim path with `/envs/env_<id>/` removed, preserving `/envs/`.
+        """
+        pattern = re.compile(r"/envs/env_[^/]+/")
+        return pattern.sub("/envs/", prim_path)

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -7,10 +7,11 @@
 
 from __future__ import annotations
 
-import torch
 from collections.abc import Sequence
-from prettytable import PrettyTable
 from typing import TYPE_CHECKING
+
+import torch
+from prettytable import PrettyTable
 
 from .manager_base import ManagerBase, ManagerTermBase
 from .manager_term_cfg import RewardTermCfg
@@ -180,47 +181,22 @@ class RewardManager(ManagerBase):
         """
         # reset computation
         self._reward_buf[:] = 0.0
-        
-        if self.reward_type in ["classic", "always_positive"]:
-            for name, term_cfg in zip(self._term_names, self._term_cfgs):
-                # skip if weight is zero (kind of a micro-optimization)
-                if term_cfg.weight == 0.0:
-                    continue
-                # compute term's value
-                value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
-                if torch.isnan(value).any() or torch.isinf(value).any():
-                    value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
-                if self.reward_type == "always_positive":
-                    value = torch.clip(value, min=0.0)
-                self._reward_buf += value
-                # update episodic sum
-                self._episode_sums[name] += value
+        # iterate over all the reward terms
+        for term_idx, (name, term_cfg) in enumerate(zip(self._term_names, self._term_cfgs)):
+            # skip if weight is zero (kind of a micro-optimization)
+            if term_cfg.weight == 0.0:
+                self._step_reward[:, term_idx] = 0.0
+                continue
+            # compute term's value
+            value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
+            # update total reward
+            self._reward_buf += value
+            # update episodic sum
+            self._episode_sums[name] += value
 
-                # Update current reward for this step.
-                self._step_reward[:, self._term_names.index(name)] = value / dt
-        elif self.reward_type == "exp_negative":
-            positive_reward = torch.zeros_like(self._reward_buf)
-            negative_reward = torch.zeros_like(self._reward_buf)
-            # iterate over all the reward terms
-            for name, term_cfg in zip(self._term_names, self._term_cfgs):
-                # skip if weight is zero (kind of a micro-optimization)
-                if term_cfg.weight == 0.0:
-                    continue
-                # compute term's value
-                value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
-                if torch.isnan(value).any() or torch.isinf(value).any():
-                    value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
-                positive_reward = torch.clip(value, min=0.0)
-                negative_reward += torch.clip(value, max=0.0)
-                # update total reward
-                self._reward_buf += positive_reward
-                # update episodic sum
-                self._episode_sums[name] += value
-
-                # Update current reward for this step.
-                self._step_reward[:, self._term_names.index(name)] = value / dt
-                
-            self._reward_buf *= torch.exp(negative_reward / self.negative_reward_scale)
+            # Update current reward for this step.
+            self._step_reward[:, self._term_names.index(name)] = value / dt
+            self._step_reward[:, term_idx] = value / dt
 
         return self._reward_buf
 

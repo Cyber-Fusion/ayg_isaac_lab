@@ -22,6 +22,7 @@ class AygRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # Switch robot to ayg and rename stuff
         self.scene.robot = AYG_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.events.add_base_mass.params["asset_cfg"].body_names = "Base"
+        self.events.base_com.params["asset_cfg"].body_names = "Base"
         self.events.base_external_force_torque.params["asset_cfg"].body_names = "Base"
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Base"
         # Rename the joints in the rewards
@@ -30,7 +31,7 @@ class AygRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.base_height_l2.params["asset_cfg"].body_names = "Base"
         self.rewards.feet_regulation.params["asset_cfg"].body_names = ".*_Foot"
         # Rename the joints in the terminations
-        self.terminations.base_contact.params["sensor_cfg"].body_names = ["Base", 'Camera', ".*_Hip"]
+        self.terminations.base_contact.params["sensor_cfg"].body_names = ["Base", ".*_Hip"]
         
         # reduce action scale
         self.actions.joint_pos.scale = 0.25
