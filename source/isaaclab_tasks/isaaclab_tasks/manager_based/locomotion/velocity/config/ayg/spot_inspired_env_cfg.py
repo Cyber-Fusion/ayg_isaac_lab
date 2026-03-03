@@ -83,6 +83,9 @@ class AygObservationsCfg:
         """Observations for policy group."""
 
         # `` observation terms (order preserved)
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.1, n_max=0.1)
+        )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel, params={"asset_cfg": SceneEntityCfg("robot")}, noise=Unoise(n_min=-0.1, n_max=0.1)
         )
@@ -101,7 +104,7 @@ class AygObservationsCfg:
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
-            self.enable_corruption = True
+            self.enable_corruption = False
             self.concatenate_terms = True
             self.history_length = 5
             self.flatten_history_dim = True
@@ -232,17 +235,17 @@ class AygRewardsCfg:
     )
     base_angular_velocity = RewardTermCfg(
         func=ayg_mdp.base_angular_velocity_reward,
-        weight=5.0,
+        weight=10.0,
         params={"std": 2.0, "asset_cfg": SceneEntityCfg("robot")},
     )
     base_linear_velocity = RewardTermCfg(
         func=ayg_mdp.base_linear_velocity_reward,
-        weight=5.0,
+        weight=10.0,
         params={"std": 1.0, "ramp_rate": 0.5, "ramp_at_vel": 1.0, "asset_cfg": SceneEntityCfg("robot")},
     )
     foot_clearance = RewardTermCfg(
         func=ayg_mdp.foot_clearance_reward,
-        weight=0.5,
+        weight=10.0,
         params={
             "std": 0.05,
             "tanh_mult": 2.0,
@@ -252,7 +255,7 @@ class AygRewardsCfg:
     )
     gait = RewardTermCfg(
         func=ayg_mdp.GaitReward,
-        weight=10.0,
+        weight=20.0,
         params={
             "std": 0.1,
             "max_err": 0.2,
@@ -348,10 +351,10 @@ class AygFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         super().__post_init__()
 
         # general settings
-        self.decimation = 4  # 50 Hz
+        self.decimation = 10  # 50 Hz
         self.episode_length_s = 20.0
         # simulation settings
-        self.sim.dt = 0.005  # 200 Hz
+        self.sim.dt = 0.002  # 500 Hz
         self.sim.render_interval = self.decimation
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0

@@ -7,6 +7,6 @@ class AygParams:
     thigh_names = ".*_Thigh"
     feet_names = ".*_Foot"
     undesired_contact_names = [".*_Thigh", ".*_Shank"]
-    termination_contact_names = ["Base", ".*_Hip"]
+    termination_contact_names = ["Base", ".*_Hip", ".*_Thigh", ".*_Shank"]
     height_scanner = SceneEntityCfg("height_scanner")
     
